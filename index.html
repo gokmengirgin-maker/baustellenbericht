@@ -211,6 +211,7 @@
         }
 
         let tempCompressedImage = null;
+        let tempCoords = null; // Geçici coğrafi konum bilgisini tutar
 
         // Daten beim Laden der Seite abrufen
         window.onload = () => {
@@ -440,6 +441,23 @@
                 ctx.fillText(timestamp, drawWidth - 20, drawHeight - 20);
                 ctx.fillText(reportData.settings.project || '', drawWidth - 20, drawHeight - 52);
 
+                // Geolocation: Fotoğraf yüklendiğinde konumu al
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                            tempCoords = {
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude
+                            };
+                        },
+                        (error) => {
+                            console.warn("Konum alınamadı:", error.message);
+                            tempCoords = null;
+                        },
+                        { enableHighAccuracy: true, timeout: 5000 }
+                    );
+                }
+
                 tempCompressedImage = canvas.toDataURL('image/jpeg', 0.7);
 
                 const preview = document.getElementById('image-preview');
@@ -475,7 +493,8 @@
                 adresse: adresse,
                 nvt:     nvt,
                 image:   tempCompressedImage,
-                date:    dateStr
+                date:    dateStr,
+                coords:  tempCoords ? { ...tempCoords } : null
             });
 
             saveToStorage();
@@ -486,6 +505,7 @@
             document.getElementById('entry-nvt').value     = '';
             document.getElementById('image-preview').classList.add('hidden');
             tempCompressedImage = null;
+            tempCoords = null;
 
             // Her iki input'u sıfırla (Clone-Trick für mobile Browser)
             ['entry-image-camera', 'entry-image-gallery'].forEach(id => {
@@ -528,6 +548,14 @@
                     : '<div class="col-span-1"></div>';
                 const dateHtml = `<div class="col-span-1"><span class="font-bold block border-b border-gray-300">Datum:</span><p class="mt-1 text-xs">${entry.date}</p></div>`;
 
+                const mapLink = entry.coords 
+                    ? `<div class="mt-2 text-xs text-blue-600 font-semibold no-print-link">
+                        <a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" class="flex items-center gap-1 hover:underline">
+                            📍 Google Maps'te Göster
+                        </a>
+                       </div>` 
+                    : '';
+
                 html += `
                 <div class="page-container avoid-break border border-gray-200 mb-8 pb-4 ${index > 0 ? 'page-break-entry' : ''}">
                     <!-- Kopfzeile: Logo + Firma + Titel -->
@@ -565,8 +593,16 @@
                             </div>
                         </div>
                         <!-- Rechte Spalte: Bild -->
-                        <div class="w-full sm:w-2/3 flex items-center justify-center bg-gray-50 rounded border p-1">
-                            <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:420px; display:block;" />
+                        <div class="w-full sm:w-2/3 flex flex-col items-center justify-center">
+                            <div class="w-full flex items-center justify-center bg-gray-50 rounded border p-1">
+                                ${entry.coords 
+                                    ? `<a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" title="In Google Maps öffnen">
+                                        <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:420px; display:block;" />
+                                       </a>`
+                                    : `<img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:420px; display:block;" />`
+                                }
+                            </div>
+                            ${mapLink}
                         </div>
                     </div>
                 </div>`;
