@@ -556,7 +556,7 @@
                         </div>
                         <!-- Rechte Spalte: Bild -->
                         <div class="w-full sm:w-2/3">
-                            <img src="${entry.image}" class="w-full object-contain rounded border" style="max-height:700px;" />
+                            <img src="${entry.image}" class="w-full object-contain rounded border" style="max-height:420px;" />
                         </div>
                     </div>
                 </div>`;
@@ -578,9 +578,10 @@
             const opt = {
                 margin:       10,
                 filename:     `Baustellenbericht_${new Date().toLocaleDateString('de-DE')}.pdf`,
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                image:        { type: 'jpeg', quality: 0.95 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pageBreak:    { mode: 'avoid-all' }
             };
 
             // HTML in PDF konvertieren und herunterladen
