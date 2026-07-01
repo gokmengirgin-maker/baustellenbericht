@@ -62,9 +62,9 @@
                     <label class="block text-sm font-medium mb-1">Adresse (Baustelle):</label>
                     <div class="flex gap-2">
                         <input type="text" id="entry-adresse" class="flex-1 border rounded p-2 focus:ring focus:ring-blue-200" placeholder="Bsp: Musterstraße 12, 64331 Weiterstadt">
-                        <button onclick="fetchCurrentAddress(event)" id="btn-get-address" class="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded flex items-center justify-center gap-1 transition" title="Aktuellen Standort ermitteln">
+                        <button onclick="fetchCurrentAddress(event)" id="btn-get-address" class="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded flex items-center justify-center gap-1 transition" title="Aktuelle Adresse ermitteln">
                             <i data-lucide="map-pin" class="w-5 h-5"></i>
-                            <span class="text-xs font-semibold hidden sm:inline">Ort ermitteln</span>
+                            <span class="text-xs font-semibold hidden sm:inline">Adresse ermitteln</span>
                         </button>
                     </div>
                 </div>
@@ -370,14 +370,16 @@
         }
 
         function clearAllData() {
-            if(confirm("Alle gespeicherten Berichte und Seiten werden gelöscht. Sind Sie sicher?")) {
+            if(confirm("Alle gespeicherten Berichte und Seiten werden unwiderruflich gelöscht. Sind Sie sicher?")) {
                 reportData.entries = [];
                 saveToStorage();
                 document.getElementById('entry-text').value = '';
-                document.getElementById('entry-image').value = '';
+                if(document.getElementById('entry-adresse')) document.getElementById('entry-adresse').value = '';
+                if(document.getElementById('entry-nvt')) document.getElementById('entry-nvt').value = '';
                 document.getElementById('image-preview').classList.add('hidden');
                 tempCompressedImage = null;
-                alert("Zurückgesetzt.");
+                tempCoords = null;
+                alert("Daten erfolgreich zurückgesetzt.");
             }
         }
 
@@ -609,7 +611,7 @@
                 }
             });
 
-            alert("Seite zum Bericht hinzugefügt! Sie können es in der Vorschau sehen.");
+            alert("Seite zum Bericht hinzugefügt! Sie können sie in der Vorschau sehen.");
             switchTab('tab-preview');
         }
 
@@ -644,7 +646,7 @@
                 const mapLink = entry.coords 
                     ? `<div class="mt-2 text-xs text-blue-600 font-semibold no-print-link">
                         <a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" class="flex items-center gap-1 hover:underline">
-                            📍 Google Maps'te Göster
+                            📍 Auf Google Maps anzeigen
                         </a>
                        </div>` 
                     : '';
@@ -690,9 +692,9 @@
                             <div class="w-full flex items-center justify-center bg-gray-50 rounded border p-1">
                                 ${entry.coords 
                                     ? `<a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" title="In Google Maps öffnen">
-                                        <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:420px; display:block;" />
+                                        <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:520px; display:block;" />
                                        </a>`
-                                    : `<img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:420px; display:block;" />`
+                                    : `<img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:520px; display:block;" />`
                                 }
                             </div>
                             ${mapLink}
