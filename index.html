@@ -59,6 +59,14 @@
         <div id="tab-form" class="tab-content active bg-white p-4 rounded-lg shadow">
             <div class="space-y-4">
                 <div>
+                    <label class="block text-sm font-medium mb-1">Adresse (Baustelle):</label>
+                    <input type="text" id="entry-adresse" class="w-full border rounded p-2 focus:ring focus:ring-blue-200" placeholder="Bsp: Musterstraße 12, 64331 Weiterstadt">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">NVT:</label>
+                    <input type="text" id="entry-nvt" class="w-full border rounded p-2 focus:ring focus:ring-blue-200" placeholder="Bsp: NVT-247">
+                </div>
+                <div>
                     <label class="block text-sm font-medium mb-1">Beschreibung (Befund etc.):</label>
                     <textarea id="entry-text" rows="3" class="w-full border rounded p-2 focus:ring focus:ring-blue-200" placeholder="Bsp: Mehrstärke Asphalt..."></textarea>
                 </div>
@@ -112,6 +120,28 @@
         <div id="tab-settings" class="tab-content bg-white p-4 rounded-lg shadow">
             <p class="text-sm text-gray-500 mb-4">Diese Einstellungen werden auf Ihrem Telefon automatisch gespeichert.</p>
             <div class="space-y-4">
+
+                <!-- Firma Bilgileri -->
+                <div class="border-b pb-4">
+                    <h3 class="font-bold text-gray-700 mb-3">Firma</h3>
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium mb-1">Firmaname:</label>
+                        <input type="text" id="set-firma-name" class="w-full border rounded p-2" placeholder="Bsp: Musterbau GmbH"
+                            oninput="reportData.settings.firmaName = this.value; renderPreview();">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Firmalogo: <span class="text-xs text-gray-500 font-normal">(Wird automatisch auf 300px verkleinert)</span></label>
+                        <div class="flex items-center gap-3">
+                            <label for="set-logo" class="cursor-pointer bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded px-3 py-2 text-sm">
+                                Logo auswählen
+                                <input type="file" id="set-logo" accept="image/*" class="hidden" onchange="loadLogo(event)">
+                            </label>
+                            <img id="logo-preview" class="hidden max-h-12 max-w-32 object-contain border rounded" />
+                            <button onclick="removeLogo()" id="remove-logo-btn" class="hidden text-xs text-red-500 hover:text-red-700">Entfernen</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div>
                     <label class="block text-sm font-medium mb-1">Projektname:</label>
                     <input type="text" id="set-project" class="w-full border rounded p-2" placeholder="Bsp: Projekt Weiterstadt West"
@@ -161,6 +191,8 @@
                 project: '',
                 person: '',
                 email: '',
+                firmaName: '',
+                firmaLogo: '',
                 headerTitle: 'Mehrkosten - {projekt}',
                 mailSubject: 'Baustellenbericht: {projekt}',
                 mailBody: 'Hallo,\n\nanbei finden Sie den aktuellen Baustellenbericht als PDF im Anhang.\n\nViele Grüße'
@@ -232,14 +264,21 @@
             const saved = localStorage.getItem('siteReportData');
             if (saved) {
                 reportData = JSON.parse(saved);
-                document.getElementById('set-project').value = reportData.settings.project || '';
-                document.getElementById('set-person').value = reportData.settings.person || '';
-                document.getElementById('set-email').value = reportData.settings.email || '';
+                document.getElementById('set-project').value      = reportData.settings.project || '';
+                document.getElementById('set-person').value       = reportData.settings.person || '';
+                document.getElementById('set-email').value        = reportData.settings.email || '';
                 document.getElementById('set-header-title').value = reportData.settings.headerTitle || 'Mehrkosten - {projekt}';
-                
-                // Standardwerte setzen, falls keine Vorlage in alten Daten vorhanden ist
+                document.getElementById('set-firma-name').value   = reportData.settings.firmaName || '';
                 document.getElementById('set-mail-subject').value = reportData.settings.mailSubject || 'Baustellenbericht: {projekt}';
-                document.getElementById('set-mail-body').value = reportData.settings.mailBody || 'Hallo,\n\nanbei finden Sie den aktuellen Baustellenbericht als PDF im Anhang.\n\nViele Grüße';
+                document.getElementById('set-mail-body').value    = reportData.settings.mailBody || 'Hallo,\n\nanbei finden Sie den aktuellen Baustellenbericht als PDF im Anhang.\n\nViele Grüße';
+
+                // Logo varsa göster
+                if (reportData.settings.firmaLogo) {
+                    const prev = document.getElementById('logo-preview');
+                    prev.src = reportData.settings.firmaLogo;
+                    prev.classList.remove('hidden');
+                    document.getElementById('remove-logo-btn').classList.remove('hidden');
+                }
 
                 renderPreview();
             }
@@ -265,16 +304,59 @@
 
         // --- EINSTELLUNGEN ---
         function saveSettings() {
-            reportData.settings.project = document.getElementById('set-project').value;
-            reportData.settings.person = document.getElementById('set-person').value;
-            reportData.settings.email = document.getElementById('set-email').value;
+            reportData.settings.project     = document.getElementById('set-project').value;
+            reportData.settings.person      = document.getElementById('set-person').value;
+            reportData.settings.email       = document.getElementById('set-email').value;
             reportData.settings.headerTitle = document.getElementById('set-header-title').value;
+            reportData.settings.firmaName   = document.getElementById('set-firma-name').value;
             reportData.settings.mailSubject = document.getElementById('set-mail-subject').value;
-            reportData.settings.mailBody = document.getElementById('set-mail-body').value;
+            reportData.settings.mailBody    = document.getElementById('set-mail-body').value;
+            // firmaLogo zaten loadLogo() ile kaydedilir
 
             saveToStorage();
             alert("Einstellungen gespeichert!");
             switchTab('tab-form');
+        }
+
+        // --- LOGO YÜKLEME (Canvas ile sıkıştırma) ---
+        async function loadLogo(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                const MAX_W = 300, MAX_H = 120;
+                let bmp = await createImageBitmap(file);
+                let w = bmp.width, h = bmp.height;
+                const ratio = Math.min(MAX_W / w, MAX_H / h, 1);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+                bmp.close();
+
+                const logoData = canvas.toDataURL('image/png');
+                reportData.settings.firmaLogo = logoData;
+                saveToStorage();
+
+                const prev = document.getElementById('logo-preview');
+                prev.src = logoData;
+                prev.classList.remove('hidden');
+                document.getElementById('remove-logo-btn').classList.remove('hidden');
+            } catch(e) {
+                alert('Fehler beim Laden des Logos.');
+            }
+        }
+
+        function removeLogo() {
+            reportData.settings.firmaLogo = '';
+            saveToStorage();
+            document.getElementById('logo-preview').classList.add('hidden');
+            document.getElementById('remove-logo-btn').classList.add('hidden');
+            // Logo input sıfırla
+            const old = document.getElementById('set-logo');
+            const neu = old.cloneNode(true);
+            old.parentNode.replaceChild(neu, old);
         }
 
         function clearAllData() {
@@ -367,7 +449,9 @@
         }
 
         function addEntry() {
-            const text = document.getElementById('entry-text').value.trim();
+            const text    = document.getElementById('entry-text').value.trim();
+            const adresse = document.getElementById('entry-adresse').value.trim();
+            const nvt     = document.getElementById('entry-nvt').value.trim();
             
             if (!text) {
                 alert("Bitte geben Sie eine Beschreibung (Befund) ein!");
@@ -383,15 +467,19 @@
             const dateStr = now.toLocaleDateString('de-DE');
 
             reportData.entries.push({
-                text: text,
-                image: tempCompressedImage,
-                date: dateStr
+                text:    text,
+                adresse: adresse,
+                nvt:     nvt,
+                image:   tempCompressedImage,
+                date:    dateStr
             });
 
             saveToStorage();
 
             // Formular leeren
-            document.getElementById('entry-text').value = '';
+            document.getElementById('entry-text').value    = '';
+            document.getElementById('entry-adresse').value = '';
+            document.getElementById('entry-nvt').value     = '';
             document.getElementById('image-preview').classList.add('hidden');
             tempCompressedImage = null;
 
@@ -422,45 +510,56 @@
             let html = '';
 
             reportData.entries.forEach((entry, index) => {
+                const headerTitle = (reportData.settings.headerTitle || 'Mehrkosten - {projekt}')
+                    .replace('{projekt}', reportData.settings.project || '');
+                const firmaNameHtml = reportData.settings.firmaName
+                    ? `<p class="text-sm text-gray-600 mt-1">${escapeHtml(reportData.settings.firmaName)}</p>` : '';
+                const logoHtml = reportData.settings.firmaLogo
+                    ? `<img src="${reportData.settings.firmaLogo}" style="max-height:50px;max-width:150px;object-fit:contain;" />` : '';
+                const adresseHtml = entry.adresse
+                    ? `<div><span class="font-bold block border-b border-gray-300">Adresse:</span><p class="mt-1">${escapeHtml(entry.adresse)}</p></div>` : '';
+                const nvtHtml = entry.nvt
+                    ? `<div><span class="font-bold block border-b border-gray-300">NVT:</span><p class="mt-1">${escapeHtml(entry.nvt)}</p></div>` : '';
+
                 html += `
                 <div class="page-container avoid-break border border-gray-200 mb-8 pb-4 ${index > 0 ? 'page-break-entry' : ''}">
-                    <!-- Kopfzeile im PDF-Stil -->
-                    <div class="border-b-2 border-black mb-4 pb-2 p-4">
-                        <h2 class="font-bold text-lg uppercase">${(reportData.settings.headerTitle || 'Mehrkosten - {projekt}').replace('{projekt}', reportData.settings.project || '')}</h2>
+                    <!-- Kopfzeile: Logo + Firma + Titel -->
+                    <div class="border-b-2 border-black mb-4 pb-2 p-4 flex justify-between items-start">
+                        <div>
+                            <h2 class="font-bold text-lg uppercase">${headerTitle}</h2>
+                            ${firmaNameHtml}
+                        </div>
+                        ${logoHtml}
                     </div>
 
                     <!-- PDF-Inhalt (Links Text - Rechts Bild) -->
                     <div class="flex flex-col sm:flex-row gap-4 p-4">
-                        
-                        <!-- Linke Spalte: Texte -->
+                        <!-- Linke Spalte -->
                         <div class="w-full sm:w-1/3 flex flex-col gap-4">
+                            ${adresseHtml}
+                            ${nvtHtml}
                             <div>
                                 <span class="font-bold block border-b border-gray-300">Befund / Beschreibung:</span>
                                 <p class="mt-1 whitespace-pre-wrap">${escapeHtml(entry.text)}</p>
                             </div>
-                            
                             <div>
                                 <span class="font-bold block border-b border-gray-300">Datum:</span>
                                 <p class="mt-1">${entry.date}</p>
                             </div>
-
                             <div>
                                 <span class="font-bold block border-b border-gray-300">Weitergegeben an:</span>
                                 <p class="mt-1">${reportData.settings.person || '-'}</p>
                             </div>
-                            
                             <div class="mt-auto pt-4">
                                 <span class="text-xs text-gray-400">Seite: ${index + 1} / ${reportData.entries.length}</span>
                             </div>
                         </div>
-
                         <!-- Rechte Spalte: Bild -->
                         <div class="w-full sm:w-2/3">
-                            <img src="${entry.image}" class="w-full object-contain rounded border" style="max-height: 700px;" />
+                            <img src="${entry.image}" class="w-full object-contain rounded border" style="max-height:700px;" />
                         </div>
                     </div>
-                </div>
-                `;
+                </div>`;
             });
 
             container.innerHTML = html;
