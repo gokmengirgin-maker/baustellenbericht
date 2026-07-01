@@ -31,6 +31,11 @@
             page-break-before: always;
             break-before: page;
         }
+        /* Verhindert, dass der Rahmen (page-container) auf zwei Seiten aufgeteilt wird */
+        .pdf-render-mode .page-container {
+            page-break-inside: avoid !important;
+            break-inside: avoid-page !important;
+        }
 
         /* Tab-Übergangsanimation */
         .tab-content { display: none; }
