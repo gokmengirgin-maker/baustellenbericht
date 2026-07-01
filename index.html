@@ -64,13 +64,18 @@
                 
                 <div>
                     <label class="block text-sm font-medium mb-1">Foto aufnehmen / hinzufügen:</label>
-                    <div class="flex items-center justify-center w-full">
-                        <label for="entry-image" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                <i data-lucide="camera" class="w-8 h-8 text-gray-500 mb-2"></i>
-                                <p class="text-sm text-gray-500"><span class="font-semibold">Foto aufnehmen</span> oder auswählen</p>
-                            </div>
-                            <input id="entry-image" type="file" accept="image/*" class="hidden" onchange="previewSelectedImage(event)" />
+                    <div class="grid grid-cols-2 gap-3">
+                        <!-- Kamera Butonu -->
+                        <label for="entry-image-camera" class="flex flex-col items-center justify-center h-28 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100">
+                            <i data-lucide="camera" class="w-7 h-7 text-blue-500 mb-1"></i>
+                            <span class="text-sm font-semibold text-blue-600">Kamera</span>
+                            <input id="entry-image-camera" type="file" accept="image/*" capture="environment" class="hidden" onchange="previewSelectedImage(event)" />
+                        </label>
+                        <!-- Galeri Butonu -->
+                        <label for="entry-image-gallery" class="flex flex-col items-center justify-center h-28 border-2 border-green-300 border-dashed rounded-lg cursor-pointer bg-green-50 hover:bg-green-100">
+                            <i data-lucide="image" class="w-7 h-7 text-green-500 mb-1"></i>
+                            <span class="text-sm font-semibold text-green-600">Galerie</span>
+                            <input id="entry-image-gallery" type="file" accept="image/*" class="hidden" onchange="previewSelectedImage(event)" />
                         </label>
                     </div>
                     <img id="image-preview" class="mt-2 hidden max-h-48 rounded object-cover mx-auto" />
@@ -379,11 +384,14 @@
             document.getElementById('image-preview').classList.add('hidden');
             tempCompressedImage = null;
 
-            // Input-Feld zurücksetzen: Clone-Trick für mobile Browser
-            // (iOS/Android'de .value='' change olayını bir sonraki seçimde tetiklemiyor)
-            const oldInput = document.getElementById('entry-image');
-            const newInput = oldInput.cloneNode(true);
-            oldInput.parentNode.replaceChild(newInput, oldInput);
+            // Her iki input'u sıfırla (Clone-Trick für mobile Browser)
+            ['entry-image-camera', 'entry-image-gallery'].forEach(id => {
+                const old = document.getElementById(id);
+                if (old) {
+                    const neu = old.cloneNode(true);
+                    old.parentNode.replaceChild(neu, old);
+                }
+            });
 
             alert("Seite zum Bericht hinzugefügt! Sie können es in der Vorschau sehen.");
             switchTab('tab-preview');
