@@ -35,6 +35,7 @@
         .pdf-render-mode .page-container {
             page-break-inside: avoid !important;
             break-inside: avoid-page !important;
+            margin-top: 15px !important; /* Verhindert das Ankleben am oberen Rand der Folgeseiten */
         }
 
         /* Tab-Übergangsanimation */
@@ -724,7 +725,7 @@
             const now = new Date();
             const timeStamp = now.toLocaleDateString('de-DE') + '_' + now.toTimeString().split(' ')[0].replace(/:/g, '-');
             const opt = {
-                margin:       10,
+                margin:       [15, 12, 15, 12], // Oben, Links, Unten, Rechts (Verhindert Abschneiden)
                 filename:     `Baustellenbericht_${timeStamp}.pdf`,
                 image:        { type: 'jpeg', quality: 0.95 },
                 html2canvas:  { scale: 2, useCORS: true, logging: false },
