@@ -113,7 +113,14 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Projektname:</label>
-                    <input type="text" id="set-project" class="w-full border rounded p-2" placeholder="Bsp: Projekt Weiterstadt West">
+                    <input type="text" id="set-project" class="w-full border rounded p-2" placeholder="Bsp: Projekt Weiterstadt West"
+                        oninput="reportData.settings.project = this.value; renderPreview();">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Berichts-Kopfzeile: <span class="text-xs text-gray-500 font-normal">(Erscheint oben im PDF)</span></label>
+                    <input type="text" id="set-header-title" class="w-full border rounded p-2" placeholder="Bsp: Mehrkosten / Baustellenbericht"
+                        oninput="reportData.settings.headerTitle = this.value; renderPreview();">
+                    <p class="text-xs text-gray-500 mt-1">Nutzen Sie <b>{projekt}</b>, um den Projektnamen einzufügen. Bsp: <i>Mehrkosten - {projekt}</i></p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Zuständige Person (Weitergegeben an):</label>
@@ -153,6 +160,7 @@
                 project: '',
                 person: '',
                 email: '',
+                headerTitle: 'Mehrkosten - {projekt}',
                 mailSubject: 'Baustellenbericht: {projekt}',
                 mailBody: 'Hallo,\n\nanbei finden Sie den aktuellen Baustellenbericht als PDF im Anhang.\n\nViele Grüße'
             }
@@ -226,6 +234,7 @@
                 document.getElementById('set-project').value = reportData.settings.project || '';
                 document.getElementById('set-person').value = reportData.settings.person || '';
                 document.getElementById('set-email').value = reportData.settings.email || '';
+                document.getElementById('set-header-title').value = reportData.settings.headerTitle || 'Mehrkosten - {projekt}';
                 
                 // Standardwerte setzen, falls keine Vorlage in alten Daten vorhanden ist
                 document.getElementById('set-mail-subject').value = reportData.settings.mailSubject || 'Baustellenbericht: {projekt}';
@@ -258,6 +267,7 @@
             reportData.settings.project = document.getElementById('set-project').value;
             reportData.settings.person = document.getElementById('set-person').value;
             reportData.settings.email = document.getElementById('set-email').value;
+            reportData.settings.headerTitle = document.getElementById('set-header-title').value;
             reportData.settings.mailSubject = document.getElementById('set-mail-subject').value;
             reportData.settings.mailBody = document.getElementById('set-mail-body').value;
 
@@ -415,7 +425,7 @@
                 <div class="page-container avoid-break border border-gray-200 mb-8 pb-4">
                     <!-- Kopfzeile im PDF-Stil -->
                     <div class="border-b-2 border-black mb-4 pb-2 p-4">
-                        <h2 class="font-bold text-lg uppercase">Mehrkosten - ${reportData.settings.project || 'Kein Projektname eingegeben'}</h2>
+                        <h2 class="font-bold text-lg uppercase">${(reportData.settings.headerTitle || 'Mehrkosten - {projekt}').replace('{projekt}', reportData.settings.project || '')}</h2>
                     </div>
 
                     <!-- PDF-Inhalt (Links Text - Rechts Bild) -->
