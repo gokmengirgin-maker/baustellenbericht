@@ -23,7 +23,7 @@
         
         /* Render-Klasse für html2pdf */
         .pdf-render-mode {
-            padding: 20px !important;
+            padding: 0px !important; /* Padding entfernt, da margin in opt bereits definiert ist */
             background: white !important;
         }
         /* Seitenumbruch: page-break-before vermeidet Leerseiten besser als page-break-after */
@@ -35,7 +35,7 @@
         .pdf-render-mode .page-container {
             page-break-inside: avoid !important;
             break-inside: avoid-page !important;
-            margin-top: 15px !important; /* Verhindert das Ankleben am oberen Rand der Folgeseiten */
+            margin-top: 10px !important; /* Verhindert das Ankleben am oberen Rand der Folgeseiten */
         }
 
         /* Tab-Übergangsanimation */
@@ -695,12 +695,12 @@
                         </div>
                         <!-- Rechte Spalte: Bild -->
                         <div class="w-full sm:w-2/3 flex flex-col items-center justify-center">
-                            <div class="w-full flex items-center justify-center bg-gray-50 rounded border p-1">
+                            <div class="w-full flex items-center justify-center bg-gray-50 rounded border p-1" style="margin-top: 10px;">
                                 ${entry.coords 
                                     ? `<a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" title="In Google Maps öffnen">
-                                        <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:600px; display:block;" />
+                                        <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:480px; display:block;" />
                                        </a>`
-                                    : `<img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:600px; display:block;" />`
+                                    : `<img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:480px; display:block;" />`
                                 }
                             </div>
                             ${mapLink}
