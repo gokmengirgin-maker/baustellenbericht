@@ -26,9 +26,10 @@
             padding: 20px !important;
             background: white !important;
         }
-        .pdf-render-mode .page-container {
-            page-break-after: always;
-            margin-bottom: 2rem;
+        /* Seitenumbruch: page-break-before vermeidet Leerseiten besser als page-break-after */
+        .pdf-render-mode .page-break-entry {
+            page-break-before: always;
+            break-before: page;
         }
 
         /* Tab-Übergangsanimation */
@@ -422,7 +423,7 @@
 
             reportData.entries.forEach((entry, index) => {
                 html += `
-                <div class="page-container avoid-break border border-gray-200 mb-8 pb-4">
+                <div class="page-container avoid-break border border-gray-200 mb-8 pb-4 ${index > 0 ? 'page-break-entry' : ''}">
                     <!-- Kopfzeile im PDF-Stil -->
                     <div class="border-b-2 border-black mb-4 pb-2 p-4">
                         <h2 class="font-bold text-lg uppercase">${(reportData.settings.headerTitle || 'Mehrkosten - {projekt}').replace('{projekt}', reportData.settings.project || '')}</h2>
@@ -459,7 +460,6 @@
                         </div>
                     </div>
                 </div>
-                <div class="page-break no-print"></div> <!-- Für den Seitenumbruch beim Drucken -->
                 `;
             });
 
