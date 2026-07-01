@@ -468,7 +468,7 @@
             }
 
             const now = new Date();
-            const dateStr = now.toLocaleDateString('de-DE');
+            const dateStr = now.toLocaleDateString('de-DE') + ' ' + now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
             reportData.entries.push({
                 text:    text,
@@ -585,9 +585,11 @@
             const element = document.getElementById('report-preview');
             element.classList.add('pdf-render-mode'); // PDF-Stil
             
+            const now = new Date();
+            const timeStamp = now.toLocaleDateString('de-DE') + '_' + now.toTimeString().split(' ')[0].replace(/:/g, '-');
             const opt = {
                 margin:       10,
-                filename:     `Baustellenbericht_${new Date().toLocaleDateString('de-DE')}.pdf`,
+                filename:     `Baustellenbericht_${timeStamp}.pdf`,
                 image:        { type: 'jpeg', quality: 0.95 },
                 html2canvas:  { scale: 2, useCORS: true, logging: false },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
