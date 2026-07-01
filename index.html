@@ -379,7 +379,6 @@
             if (!file) return;
 
             try {
-                const MAX_WIDTH = 1200;
                 let source, drawWidth, drawHeight;
 
                 if (typeof createImageBitmap !== 'undefined') {
@@ -410,8 +409,7 @@
                 }
 
                 // En-boy oranı korunarak hem genişlik hem yükseklik sınırla
-                // MAX_HEIGHT: PDF sayfasına sığması için (A4 yaklaşık 900px içerik yüksekliği)
-                const MAX_WIDTH = 1200;
+                const MAX_WIDTH  = 1200;
                 const MAX_HEIGHT = 900;
                 const scaleRatio = Math.min(
                     drawWidth  > MAX_WIDTH  ? MAX_WIDTH  / drawWidth  : 1,
