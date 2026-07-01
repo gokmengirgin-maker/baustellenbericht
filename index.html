@@ -60,7 +60,13 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium mb-1">Adresse (Baustelle):</label>
-                    <input type="text" id="entry-adresse" class="w-full border rounded p-2 focus:ring focus:ring-blue-200" placeholder="Bsp: Musterstraße 12, 64331 Weiterstadt">
+                    <div class="flex gap-2">
+                        <input type="text" id="entry-adresse" class="flex-1 border rounded p-2 focus:ring focus:ring-blue-200" placeholder="Bsp: Musterstraße 12, 64331 Weiterstadt">
+                        <button onclick="fetchCurrentAddress(event)" id="btn-get-address" class="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded flex items-center justify-center gap-1 transition" title="Aktuellen Standort ermitteln">
+                            <i data-lucide="map-pin" class="w-5 h-5"></i>
+                            <span class="text-xs font-semibold hidden sm:inline">Ort ermitteln</span>
+                        </button>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">NVT:</label>
@@ -224,6 +230,9 @@
             if (navigator.share) {
                 document.getElementById('native-share-btn').classList.remove('hidden');
             }
+
+            // Sayfa yüklendiğinde Lucide ikonlarını tekrar tetikle
+            lucide.createIcons();
 
             // --- F12 / DevTools Engelleme ---
             // Sağ tık menüsünü devre dışı bırak
@@ -460,6 +469,16 @@
 
                 tempCompressedImage = canvas.toDataURL('image/jpeg', 0.7);
 
+                // Eğer fotoğraf yüklendiğinde hâlâ adres girilmemişse, otomatik olarak adresi çekmeye çalış
+                const currentAddrInput = document.getElementById('entry-adresse');
+                if (!currentAddrInput.value.trim()) {
+                    setTimeout(() => {
+                        if (tempCoords) {
+                            getAddressFromCoords(tempCoords.latitude, tempCoords.longitude);
+                        }
+                    }, 800);
+                }
+
                 const preview = document.getElementById('image-preview');
                 preview.src = tempCompressedImage;
                 preview.classList.remove('hidden');
@@ -467,6 +486,80 @@
             } catch (err) {
                 console.error('Bildfehler:', err);
                 alert('Fehler beim Laden des Bildes. Bitte erneut versuchen.');
+            }
+        }
+
+        // --- OTOMATİK ADRES BULMA (Reverse Geocoding) ---
+        function fetchCurrentAddress(e) {
+            if (e) e.preventDefault();
+            const btn = document.getElementById('btn-get-address');
+            const originalHtml = btn.innerHTML;
+
+            if (!navigator.geolocation) {
+                alert("GPS-Standort wird von Ihrem Gerät nicht unterstützt.");
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = `<span class="animate-spin mr-1">⌛</span> <span class="text-xs">Lade...</span>`;
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    
+                    // Geçici koordinatları da doldur (resim eklenmeden önce butona basılırsa)
+                    tempCoords = { latitude: lat, longitude: lon };
+
+                    await getAddressFromCoords(lat, lon);
+                    
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                    lucide.createIcons();
+                },
+                (error) => {
+                    alert("Standort konnte nicht ermittelt werden: " + error.message);
+                    btn.disabled = false;
+                    btn.innerHTML = originalHtml;
+                    lucide.createIcons();
+                },
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
+        }
+
+        async function getAddressFromCoords(lat, lon) {
+            try {
+                // OpenStreetMap Nominatim API (Ücretsiz ve key gerektirmez)
+                // User-Agent göndermek Nominatim kullanım politikasında zorunludur.
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`, {
+                    headers: {
+                        'Accept-Language': 'de' // Adresi Almanca formatta almak için
+                    }
+                });
+                
+                if (!response.ok) throw new Error("API-Fehler");
+                
+                const data = await response.json();
+                if (data && data.address) {
+                    const addr = data.address;
+                    const street = addr.road || addr.suburb || '';
+                    const houseNumber = addr.house_number || '';
+                    const postcode = addr.postcode || '';
+                    const city = addr.city || addr.town || addr.village || '';
+                    
+                    let formattedAddress = '';
+                    if (street) formattedAddress += street;
+                    if (houseNumber) formattedAddress += ' ' + houseNumber;
+                    if (formattedAddress && (postcode || city)) formattedAddress += ', ';
+                    if (postcode) formattedAddress += postcode + ' ';
+                    if (city) formattedAddress += city;
+
+                    if (formattedAddress) {
+                        document.getElementById('entry-adresse').value = formattedAddress.trim();
+                    }
+                }
+            } catch (err) {
+                console.error("Adressfehler:", err);
             }
         }
 
