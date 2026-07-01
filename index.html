@@ -70,7 +70,7 @@
                                 <i data-lucide="camera" class="w-8 h-8 text-gray-500 mb-2"></i>
                                 <p class="text-sm text-gray-500"><span class="font-semibold">Foto aufnehmen</span> oder auswählen</p>
                             </div>
-                            <input id="entry-image" type="file" accept="image/*" capture="environment" class="hidden" onchange="previewSelectedImage(event)" />
+                            <input id="entry-image" type="file" accept="image/*" class="hidden" onchange="previewSelectedImage(event)" />
                         </label>
                     </div>
                     <img id="image-preview" class="mt-2 hidden max-h-48 rounded object-cover mx-auto" />
@@ -273,125 +273,81 @@
             }
         }
 
-        // --- EXIF ORIENTIERUNG LESEN (iOS Rotations-Fix) ---
-        function getExifOrientation(file, callback) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const view = new DataView(e.target.result);
-                // JPEG başlığı kontrolü
-                if (view.getUint16(0, false) !== 0xFFD8) { callback(1); return; }
-                const length = view.byteLength;
-                let offset = 2;
-                while (offset < length) {
-                    const marker = view.getUint16(offset, false);
-                    offset += 2;
-                    if (marker === 0xFFE1) { // APP1 - EXIF
-                        if (view.getUint32(offset += 2, false) !== 0x45786966) { callback(1); return; }
-                        const little = view.getUint16(offset += 6, false) === 0x4949;
-                        offset += view.getUint32(offset + 4, little);
-                        const tags = view.getUint16(offset, little);
-                        offset += 2;
-                        for (let i = 0; i < tags; i++) {
-                            if (view.getUint16(offset + (i * 12), little) === 0x0112) {
-                                callback(view.getUint16(offset + (i * 12) + 8, little));
-                                return;
-                            }
-                        }
-                    } else if ((marker & 0xFF00) !== 0xFF00) break;
-                    else offset += view.getUint16(offset, false);
-                }
-                callback(1); // Orientation bulunamazsa varsayılan: 1 (normal)
-            };
-            reader.readAsArrayBuffer(file.slice(0, 65536));
-        }
-
-        // Canvas'a EXIF yönüne göre doğru transform uygula
-        function applyExifRotation(canvas, ctx, orientation, width, height) {
-            if (orientation > 4) {
-                // 90° veya 270°: genişlik/yükseklik değişir
-                canvas.width = height;
-                canvas.height = width;
-            }
-            switch (orientation) {
-                case 2: ctx.transform(-1, 0, 0, 1, width, 0); break;
-                case 3: ctx.transform(-1, 0, 0, -1, width, height); break;
-                case 4: ctx.transform(1, 0, 0, -1, 0, height); break;
-                case 5: ctx.transform(0, 1, 1, 0, 0, 0); break;
-                case 6: ctx.transform(0, 1, -1, 0, height, 0); break;
-                case 7: ctx.transform(0, -1, -1, 0, height, width); break;
-                case 8: ctx.transform(0, -1, 1, 0, 0, width); break;
-                default: break; // 1: normal, transform gerekmez
-            }
-        }
-
         // --- BILDVERARBEITUNG UND ZEITSTEMPEL ---
-        function previewSelectedImage(event) {
+        // createImageBitmap ile EXIF rotasyonu otomatik düzeltilir (Chrome 83+, iOS Safari 15+)
+        // Manuel EXIF parse gerekmez — modern mobil taıyıcılar zaten düzeltir.
+        async function previewSelectedImage(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            // Önce EXIF yön bilgisini oku, sonra görseli işle
-            getExifOrientation(file, function(orientation) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const img = new Image();
-                    img.onload = function() {
-                        const MAX_WIDTH = 1200;
-                        let width = img.width;
-                        let height = img.height;
+            try {
+                const MAX_WIDTH = 1200;
+                let source, drawWidth, drawHeight;
 
-                        // 90° veya 270° döndürülmüşse gerçek boyutları değiştir
-                        const isRotated = orientation >= 5 && orientation <= 8;
-                        let drawWidth  = isRotated ? height : width;
-                        let drawHeight = isRotated ? width  : height;
+                if (typeof createImageBitmap !== 'undefined') {
+                    try {
+                        // imageOrientation:'from-image' → EXIF yönünü otomatik uygular
+                        source = await createImageBitmap(file, { imageOrientation: 'from-image' });
+                    } catch (e) {
+                        // Eski taıyıcı fallback (imageOrientation desteklenmiyorsa)
+                        source = await createImageBitmap(file);
+                    }
+                    drawWidth  = source.width;
+                    drawHeight = source.height;
+                } else {
+                    // createImageBitmap desteklemeyen çok eski taıyıcılar için FileReader fallback
+                    source = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = e => {
+                            const img = new Image();
+                            img.onload = () => resolve(img);
+                            img.onerror = reject;
+                            img.src = e.target.result;
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                    drawWidth  = source.width;
+                    drawHeight = source.height;
+                }
 
-                        // Boyutu sınırla
-                        if (drawWidth > MAX_WIDTH) {
-                            const ratio = MAX_WIDTH / drawWidth;
-                            drawWidth  = MAX_WIDTH;
-                            drawHeight = Math.round(drawHeight * ratio);
-                            width  = isRotated ? drawHeight : drawWidth;
-                            height = isRotated ? drawWidth  : drawHeight;
-                        }
+                // Boyutu sınırla (e-posta için)
+                if (drawWidth > MAX_WIDTH) {
+                    const ratio = MAX_WIDTH / drawWidth;
+                    drawHeight = Math.round(drawHeight * ratio);
+                    drawWidth  = MAX_WIDTH;
+                }
 
-                        const canvas = document.createElement('canvas');
-                        canvas.width  = drawWidth;
-                        canvas.height = drawHeight;
-                        const ctx = canvas.getContext('2d');
+                const canvas = document.createElement('canvas');
+                canvas.width  = drawWidth;
+                canvas.height = drawHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(source, 0, 0, drawWidth, drawHeight);
+                if (source.close) source.close(); // ImageBitmap bellek serbest bırak
 
-                        // EXIF rotasyonunu düzelt (iOS fix)
-                        applyExifRotation(canvas, ctx, orientation, width, height);
+                // Zeitstempel auf dem Foto
+                const now = new Date();
+                const timestamp = now.toLocaleDateString('de-DE') + ' ' + now.toLocaleTimeString('de-DE');
+                ctx.font        = `bold ${Math.round(drawWidth / 40)}px Arial`;
+                ctx.fillStyle   = 'white';
+                ctx.shadowColor = 'black';
+                ctx.shadowBlur  = 4;
+                ctx.shadowOffsetX = 2;
+                ctx.shadowOffsetY = 2;
+                ctx.textAlign   = 'right';
+                ctx.fillText(timestamp, drawWidth - 20, drawHeight - 20);
+                ctx.fillText(reportData.settings.project || '', drawWidth - 20, drawHeight - 52);
 
-                        ctx.drawImage(img, 0, 0, width, height);
+                tempCompressedImage = canvas.toDataURL('image/jpeg', 0.7);
 
-                        // Zeitstempel auf dem Foto
-                        const now = new Date();
-                        const timestamp = now.toLocaleDateString('de-DE') + ' ' + now.toLocaleTimeString('de-DE');
+                const preview = document.getElementById('image-preview');
+                preview.src = tempCompressedImage;
+                preview.classList.remove('hidden');
 
-                        ctx.font = `bold ${Math.round(drawWidth / 40)}px Arial`;
-                        ctx.fillStyle = "white";
-                        ctx.shadowColor = "black";
-                        ctx.shadowBlur = 4;
-                        ctx.shadowOffsetX = 2;
-                        ctx.shadowOffsetY = 2;
-                        ctx.textAlign = "right";
-
-                        // Rotasyon sonrası doğru koordinatlar
-                        const tx = drawWidth - 20;
-                        const ty1 = drawHeight - 20;
-                        const ty2 = drawHeight - 50;
-                        ctx.fillText(timestamp, tx, ty1);
-                        ctx.fillText(reportData.settings.project, tx, ty2);
-
-                        tempCompressedImage = canvas.toDataURL('image/jpeg', 0.7);
-
-                        const preview = document.getElementById('image-preview');
-                        preview.src = tempCompressedImage;
-                        preview.classList.remove('hidden');
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
+            } catch (err) {
+                console.error('Bildfehler:', err);
+                alert('Fehler beim Laden des Bildes. Bitte erneut versuchen.');
+            }
         }
 
         function addEntry() {
@@ -420,9 +376,14 @@
 
             // Formular leeren
             document.getElementById('entry-text').value = '';
-            document.getElementById('entry-image').value = '';
             document.getElementById('image-preview').classList.add('hidden');
             tempCompressedImage = null;
+
+            // Input-Feld zurücksetzen: Clone-Trick für mobile Browser
+            // (iOS/Android'de .value='' change olayını bir sonraki seçimde tetiklemiyor)
+            const oldInput = document.getElementById('entry-image');
+            const newInput = oldInput.cloneNode(true);
+            oldInput.parentNode.replaceChild(newInput, oldInput);
 
             alert("Seite zum Bericht hinzugefügt! Sie können es in der Vorschau sehen.");
             switchTab('tab-preview');
