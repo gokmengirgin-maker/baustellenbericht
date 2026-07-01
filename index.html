@@ -409,11 +409,17 @@
                     drawHeight = source.height;
                 }
 
-                // Boyutu sınırla (e-posta için)
-                if (drawWidth > MAX_WIDTH) {
-                    const ratio = MAX_WIDTH / drawWidth;
-                    drawHeight = Math.round(drawHeight * ratio);
-                    drawWidth  = MAX_WIDTH;
+                // En-boy oranı korunarak hem genişlik hem yükseklik sınırla
+                // MAX_HEIGHT: PDF sayfasına sığması için (A4 yaklaşık 900px içerik yüksekliği)
+                const MAX_WIDTH = 1200;
+                const MAX_HEIGHT = 900;
+                const scaleRatio = Math.min(
+                    drawWidth  > MAX_WIDTH  ? MAX_WIDTH  / drawWidth  : 1,
+                    drawHeight > MAX_HEIGHT ? MAX_HEIGHT / drawHeight : 1
+                );
+                if (scaleRatio < 1) {
+                    drawWidth  = Math.round(drawWidth  * scaleRatio);
+                    drawHeight = Math.round(drawHeight * scaleRatio);
                 }
 
                 const canvas = document.createElement('canvas');
