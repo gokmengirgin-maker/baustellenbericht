@@ -100,6 +100,9 @@
                         </label>
                     </div>
                     <img id="image-preview" class="mt-2 hidden max-h-48 rounded object-cover mx-auto" />
+                    <button id="btn-edit-photo" onclick="openPhotoEditor(event)" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-bold text-sm flex justify-center items-center gap-2 hidden transition no-print">
+                        <i data-lucide="edit-3"></i> Foto bearbeiten / markieren
+                    </button>
                 </div>
 
                 <button onclick="addEntry()" class="w-full bg-green-500 text-white py-3 rounded-lg font-bold text-lg flex justify-center items-center gap-2 hover:bg-green-600 transition">
@@ -165,9 +168,54 @@
                         oninput="reportData.settings.headerTitle = this.value; renderPreview();">
                     <p class="text-xs text-gray-500 mt-1">Nutzen Sie <b>{projekt}</b>, um den Projektnamen einzufügen. Bsp: <i>Mehrkosten - {projekt}</i></p>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1">Zuständige Person (Weitergegeben an):</label>
-                    <input type="text" id="set-person" class="w-full border rounded p-2" placeholder="Bsp: Nick Hißen">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Unterschrift 1 (Titel):</label>
+                        <input type="text" id="set-sig-title-1" class="w-full border rounded p-2 text-sm" placeholder="Bsp: Bauleiter" oninput="reportData.settings.signatureTitle1 = this.value; renderPreview();">
+                        
+                        <div class="mt-2 flex flex-col gap-2">
+                            <div class="flex items-center gap-1">
+                                <button onclick="openSignaturePad(1, event)" class="bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs px-2 py-1 rounded font-semibold flex items-center gap-1">
+                                    <i data-lucide="pen-tool" class="w-3 h-3"></i> Zeichnen
+                                </button>
+                                <label class="cursor-pointer bg-green-100 text-green-700 hover:bg-green-200 text-xs px-2 py-1 rounded font-semibold flex items-center gap-1">
+                                    <i data-lucide="upload" class="w-3 h-3"></i> Hochladen
+                                    <input type="file" accept="image/*" class="hidden" onchange="uploadSignatureImage(1, event)">
+                                </label>
+                                <button type="button" id="btn-clear-sig-1" onclick="clearSignatureImage(1, event)" class="hidden bg-red-100 text-red-700 hover:bg-red-200 text-xs px-2 py-1 rounded font-semibold flex items-center gap-1">
+                                    <i data-lucide="trash-2" class="w-3 h-3"></i> Löschen
+                                </button>
+                            </div>
+                            <div class="border rounded bg-gray-50 flex items-center justify-center p-2 h-16 relative">
+                                <span id="sig-placeholder-1" class="text-[10px] text-gray-400">Keine Unterschrift</span>
+                                <img id="sig-preview-1" class="hidden max-h-full object-contain" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Unterschrift 2 (Titel):</label>
+                        <input type="text" id="set-sig-title-2" class="w-full border rounded p-2 text-sm" placeholder="Bsp: Polier / Kunde" oninput="reportData.settings.signatureTitle2 = this.value; renderPreview();">
+                        
+                        <div class="mt-2 flex flex-col gap-2">
+                            <div class="flex items-center gap-1">
+                                <button onclick="openSignaturePad(2, event)" class="bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs px-2 py-1 rounded font-semibold flex items-center gap-1">
+                                    <i data-lucide="pen-tool" class="w-3 h-3"></i> Zeichnen
+                                </button>
+                                <label class="cursor-pointer bg-green-100 text-green-700 hover:bg-green-200 text-xs px-2 py-1 rounded font-semibold flex items-center gap-1">
+                                    <i data-lucide="upload" class="w-3 h-3"></i> Hochladen
+                                    <input type="file" accept="image/*" class="hidden" onchange="uploadSignatureImage(2, event)">
+                                </label>
+                                <button type="button" id="btn-clear-sig-2" onclick="clearSignatureImage(2, event)" class="hidden bg-red-100 text-red-700 hover:bg-red-200 text-xs px-2 py-1 rounded font-semibold flex items-center gap-1">
+                                    <i data-lucide="trash-2" class="w-3 h-3"></i> Löschen
+                                </button>
+                            </div>
+                            <div class="border rounded bg-gray-50 flex items-center justify-center p-2 h-16 relative">
+                                <span id="sig-placeholder-2" class="text-[10px] text-gray-400">Keine Unterschrift</span>
+                                <img id="sig-preview-2" class="hidden max-h-full object-contain" />
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium mb-1">Ziel-E-Mail-Adresse(n): <span class="text-xs text-gray-500 font-normal">(Mit Komma getrennt)</span></label>
@@ -192,7 +240,87 @@
                 </button>
             </div>
         </div>
+    </div>
 
+    <!-- Signature Modal -->
+    <div id="sig-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-[100] p-4 no-print">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div class="bg-blue-600 text-white p-4 flex justify-between items-center">
+                <h3 id="sig-modal-title" class="font-bold text-lg">Unterschrift zeichnen</h3>
+                <button onclick="closeSignaturePad(event)" class="text-white hover:text-gray-200 text-xl font-bold">&times;</button>
+            </div>
+            <div class="p-4 flex-1 flex flex-col gap-4">
+                <p class="text-xs text-gray-500">Bitte unterschreiben Sie mit Ihrem Finger oder der Maus in dem grauen Feld unten.</p>
+                <div class="border-2 border-dashed border-gray-300 rounded bg-gray-50 relative flex items-center justify-center overflow-hidden" style="height: 220px;">
+                    <canvas id="sig-canvas" class="absolute inset-0 w-full h-full cursor-crosshair touch-none"></canvas>
+                </div>
+            </div>
+            <div class="bg-gray-100 p-4 flex justify-between gap-2 border-t">
+                <button onclick="clearSignatureCanvas(event)" class="bg-gray-300 text-gray-700 hover:bg-gray-400 font-semibold px-4 py-2 rounded text-sm transition">Zurücksetzen</button>
+                <div class="flex gap-2">
+                    <button onclick="closeSignaturePad(event)" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold px-4 py-2 rounded text-sm transition">Abbrechen</button>
+                    <button onclick="saveSignatureCanvas(event)" class="bg-blue-600 text-white hover:bg-blue-700 font-semibold px-4 py-2 rounded text-sm transition">Übernehmen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Editor Modal -->
+    <div id="photo-editor-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-[100] p-2 sm:p-4 no-print">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl overflow-hidden flex flex-col h-[90vh] max-h-[800px]">
+            <!-- Header -->
+            <div class="bg-blue-600 text-white p-3 sm:p-4 flex justify-between items-center">
+                <h3 class="font-bold text-base sm:text-lg flex items-center gap-2">
+                    <i data-lucide="edit-3" class="w-5 h-5"></i> Foto bearbeiten / markieren
+                </h3>
+                <button onclick="closePhotoEditor(event)" class="text-white hover:text-gray-200 text-2xl font-bold">&times;</button>
+            </div>
+            
+            <!-- Toolbar -->
+            <div class="bg-gray-100 p-2 border-b flex flex-wrap justify-between items-center gap-2">
+                <!-- Tool Selection -->
+                <div class="flex items-center gap-1.5">
+                    <button id="tool-pen" onclick="setEditorTool('pen', event)" class="bg-blue-600 text-white border border-blue-600 px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition" title="Freihand zeichnen">
+                        <i data-lucide="pen-tool" class="w-3.5 h-3.5"></i> Stift
+                    </button>
+                    <button id="tool-arrow" onclick="setEditorTool('arrow', event)" class="bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition" title="Pfeil zeichnen">
+                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i> Pfeil
+                    </button>
+                </div>
+                
+                <!-- Color Palette -->
+                <div class="flex items-center gap-1.5">
+                    <span class="text-xs text-gray-500 mr-1 hidden sm:inline">Farbe:</span>
+                    <button onclick="setEditorColor('#ef4444', event)" class="w-7 h-7 rounded-full bg-red-500 border-2 border-white ring-2 ring-red-500 ring-offset-1 focus:outline-none transition-transform hover:scale-110" id="color-red"></button>
+                    <button onclick="setEditorColor('#22c55e', event)" class="w-7 h-7 rounded-full bg-green-500 border-2 border-white ring-0 ring-green-500 ring-offset-1 focus:outline-none transition-transform hover:scale-110" id="color-green"></button>
+                    <button onclick="setEditorColor('#3b82f6', event)" class="w-7 h-7 rounded-full bg-blue-500 border-2 border-white ring-0 ring-blue-500 ring-offset-1 focus:outline-none transition-transform hover:scale-110" id="color-blue"></button>
+                    <button onclick="setEditorColor('#eab308', event)" class="w-7 h-7 rounded-full bg-yellow-400 border-2 border-white ring-0 ring-yellow-400 ring-offset-1 focus:outline-none transition-transform hover:scale-110" id="color-yellow"></button>
+                </div>
+                
+                <!-- Actions -->
+                <div class="flex items-center gap-1.5 ml-auto">
+                    <button onclick="undoEditorStroke(event)" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition" title="Rückgängig">
+                        <i data-lucide="undo" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Rückgängig</span>
+                    </button>
+                    <button onclick="resetEditorDrawings(event)" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition" title="Zeichnungen zurücksetzen">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">Löschen</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Canvas Container -->
+            <div class="flex-1 bg-gray-900 p-2 sm:p-4 flex items-center justify-center overflow-hidden relative">
+                <div id="editor-canvas-wrapper" class="relative max-w-full max-h-full flex items-center justify-center">
+                    <canvas id="editor-canvas" class="cursor-crosshair shadow-lg touch-none" style="display:block;"></canvas>
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div class="bg-gray-100 p-3 sm:p-4 flex justify-end gap-2 border-t">
+                <button onclick="closePhotoEditor(event)" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 font-semibold px-4 py-2 rounded text-sm transition">Abbrechen</button>
+                <button onclick="savePhotoEditor(event)" class="bg-blue-600 text-white hover:bg-blue-700 font-semibold px-4 py-2 rounded text-sm transition">Speichern & Übernehmen</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -201,7 +329,10 @@
             entries: [],
             settings: {
                 project: '',
-                person: '',
+                signatureTitle1: 'Auftragnehmer',
+                signatureTitle2: 'Auftraggeber',
+                signatureImage1: '',
+                signatureImage2: '',
                 email: '',
                 firmaName: '',
                 firmaLogo: '',
@@ -236,6 +367,11 @@
             if (navigator.share) {
                 document.getElementById('native-share-btn').classList.remove('hidden');
             }
+
+            // Signature & Photo Editor init
+            initSignatureCanvas();
+            initPhotoEditor();
+            updateSignaturePreviews();
 
             // Sayfa yüklendiğinde Lucide ikonlarını tekrar tetikle
             lucide.createIcons();
@@ -280,8 +416,17 @@
             const saved = localStorage.getItem('siteReportData');
             if (saved) {
                 reportData = JSON.parse(saved);
+                
+                // Defaults for signatures
+                if (!reportData.settings) reportData.settings = {};
+                if (!reportData.settings.signatureTitle1) reportData.settings.signatureTitle1 = 'Auftragnehmer';
+                if (!reportData.settings.signatureTitle2) reportData.settings.signatureTitle2 = 'Auftraggeber';
+                if (reportData.settings.signatureImage1 === undefined) reportData.settings.signatureImage1 = '';
+                if (reportData.settings.signatureImage2 === undefined) reportData.settings.signatureImage2 = '';
+
                 document.getElementById('set-project').value      = reportData.settings.project || '';
-                document.getElementById('set-person').value       = reportData.settings.person || '';
+                document.getElementById('set-sig-title-1').value = reportData.settings.signatureTitle1 || '';
+                document.getElementById('set-sig-title-2').value = reportData.settings.signatureTitle2 || '';
                 document.getElementById('set-email').value        = reportData.settings.email || '';
                 document.getElementById('set-header-title').value = reportData.settings.headerTitle || 'Mehrkosten - {projekt}';
                 document.getElementById('set-firma-name').value   = reportData.settings.firmaName || '';
@@ -296,12 +441,27 @@
                     document.getElementById('remove-logo-btn').classList.remove('hidden');
                 }
 
+                updateSignaturePreviews();
                 renderPreview();
             }
         }
 
         function saveToStorage() {
-            localStorage.setItem('siteReportData', JSON.stringify(reportData));
+            try {
+                localStorage.setItem('siteReportData', JSON.stringify(reportData));
+            } catch (e) {
+                if (e.name === 'QuotaExceededError' || e.code === 22) {
+                    alert(
+                        "⚠️ Speicher voll!\n\n" +
+                        "Der Browser-Speicher ist ausgeschöpft (Bilder zu groß).\n" +
+                        "Bitte:\n" +
+                        "  1. PDF herunterladen und sichern\n" +
+                        "  2. Dann 'Zurücksetzen' klicken, um Platz zu schaffen."
+                    );
+                } else {
+                    console.error('Speicherfehler:', e);
+                }
+            }
             renderPreview();
         }
 
@@ -321,7 +481,8 @@
         // --- EINSTELLUNGEN ---
         function saveSettings() {
             reportData.settings.project     = document.getElementById('set-project').value;
-            reportData.settings.person      = document.getElementById('set-person').value;
+            reportData.settings.signatureTitle1 = document.getElementById('set-sig-title-1').value;
+            reportData.settings.signatureTitle2 = document.getElementById('set-sig-title-2').value;
             reportData.settings.email       = document.getElementById('set-email').value;
             reportData.settings.headerTitle = document.getElementById('set-header-title').value;
             reportData.settings.firmaName   = document.getElementById('set-firma-name').value;
@@ -383,6 +544,7 @@
                 if(document.getElementById('entry-adresse')) document.getElementById('entry-adresse').value = '';
                 if(document.getElementById('entry-nvt')) document.getElementById('entry-nvt').value = '';
                 document.getElementById('image-preview').classList.add('hidden');
+                if (document.getElementById('btn-edit-photo')) document.getElementById('btn-edit-photo').classList.add('hidden');
                 tempCompressedImage = null;
                 tempCoords = null;
                 alert("Daten erfolgreich zurückgesetzt.");
@@ -490,6 +652,7 @@
                 const preview = document.getElementById('image-preview');
                 preview.src = tempCompressedImage;
                 preview.classList.remove('hidden');
+                if (document.getElementById('btn-edit-photo')) document.getElementById('btn-edit-photo').classList.remove('hidden');
 
             } catch (err) {
                 console.error('Bildfehler:', err);
@@ -605,6 +768,7 @@
             document.getElementById('entry-adresse').value = '';
             document.getElementById('entry-nvt').value     = '';
             document.getElementById('image-preview').classList.add('hidden');
+            if (document.getElementById('btn-edit-photo')) document.getElementById('btn-edit-photo').classList.add('hidden');
             tempCompressedImage = null;
             tempCoords = null;
 
@@ -684,11 +848,6 @@
                                 <p class="mt-1 whitespace-pre-wrap text-xs sm:text-sm">${escapeHtml(entry.text)}</p>
                             </div>
                             
-                            <div>
-                                <span class="font-bold block border-b border-gray-300">Weitergegeben an:</span>
-                                <p class="mt-1 text-xs sm:text-sm">${reportData.settings.person || '-'}</p>
-                            </div>
-                            
                             <div class="mt-auto pt-4">
                                 <span class="text-xs text-gray-400">Seite: ${index + 1} / ${reportData.entries.length}</span>
                             </div>
@@ -698,12 +857,38 @@
                             <div class="w-full flex items-center justify-center bg-gray-50 rounded border p-1" style="margin-top: 10px;">
                                 ${entry.coords 
                                     ? `<a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" title="In Google Maps öffnen">
-                                        <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:580px; display:block;" />
+                                        <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:500px; display:block;" />
                                        </a>`
-                                    : `<img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:580px; display:block;" />`
+                                    : `<img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:500px; display:block;" />`
                                 }
                             </div>
                             ${mapLink}
+                        </div>
+                    </div>
+                    
+                    <!-- Unterschriftenbereich -->
+                    <div class="mt-6 pt-4 border-t border-gray-300 grid grid-cols-2 gap-8 px-8 avoid-break">
+                        <div class="text-center flex flex-col justify-end items-center h-28">
+                            <p class="text-xs text-gray-500 font-semibold mb-1">${escapeHtml(reportData.settings.signatureTitle1) || 'Auftragnehmer'}</p>
+                            <div class="h-16 flex items-center justify-center">
+                                ${reportData.settings.signatureImage1 
+                                    ? `<img src="${reportData.settings.signatureImage1}" class="max-h-16 max-w-full object-contain" />` 
+                                    : ''
+                                }
+                            </div>
+                            <div class="border-t border-gray-400 w-3/4 mt-1"></div>
+                            <p class="text-[10px] text-gray-400 mt-1">Unterschrift / Stempel</p>
+                        </div>
+                        <div class="text-center flex flex-col justify-end items-center h-28">
+                            <p class="text-xs text-gray-500 font-semibold mb-1">${escapeHtml(reportData.settings.signatureTitle2) || 'Auftraggeber'}</p>
+                            <div class="h-16 flex items-center justify-center">
+                                ${reportData.settings.signatureImage2 
+                                    ? `<img src="${reportData.settings.signatureImage2}" class="max-h-16 max-w-full object-contain" />` 
+                                    : ''
+                                }
+                            </div>
+                            <div class="border-t border-gray-400 w-3/4 mt-1"></div>
+                            <p class="text-[10px] text-gray-400 mt-1">Unterschrift / Stempel</p>
                         </div>
                     </div>
                 </div>`;
@@ -795,6 +980,497 @@
                 console.error("Teilen-Fehler:", error);
                 alert("Beim Teilen ist ein Fehler aufgetreten.");
             }
+        }
+
+        // --- DIGITALE UNTERSCHRIFTEN (CANVAS & IMAGE UPLOAD) ---
+        let currentSigIndex = 1;
+        let sigCanvas = null;
+        let sigCtx = null;
+        let isSigDrawing = false;
+        let lastSigX = 0;
+        let lastSigY = 0;
+
+        function initSignatureCanvas() {
+            sigCanvas = document.getElementById('sig-canvas');
+            if (!sigCanvas) return;
+            sigCtx = sigCanvas.getContext('2d');
+
+            // Mouse events
+            sigCanvas.addEventListener('mousedown', (e) => {
+                isSigDrawing = true;
+                const pos = getCanvasMousePos(e);
+                lastSigX = pos.x;
+                lastSigY = pos.y;
+            });
+            sigCanvas.addEventListener('mousemove', (e) => {
+                if (!isSigDrawing) return;
+                const pos = getCanvasMousePos(e);
+                drawSigLine(lastSigX, lastSigY, pos.x, pos.y);
+                lastSigX = pos.x;
+                lastSigY = pos.y;
+            });
+            sigCanvas.addEventListener('mouseup', () => { isSigDrawing = false; });
+            sigCanvas.addEventListener('mouseleave', () => { isSigDrawing = false; });
+
+            // Touch events for mobile devices
+            sigCanvas.addEventListener('touchstart', (e) => {
+                isSigDrawing = true;
+                const pos = getCanvasTouchPos(e);
+                lastSigX = pos.x;
+                lastSigY = pos.y;
+                e.preventDefault();
+            }, { passive: false });
+            sigCanvas.addEventListener('touchmove', (e) => {
+                if (!isSigDrawing) return;
+                const pos = getCanvasTouchPos(e);
+                drawSigLine(lastSigX, lastSigY, pos.x, pos.y);
+                lastSigX = pos.x;
+                lastSigY = pos.y;
+                e.preventDefault();
+            }, { passive: false });
+            sigCanvas.addEventListener('touchend', (e) => {
+                isSigDrawing = false;
+                e.preventDefault();
+            }, { passive: false });
+        }
+
+        function getCanvasMousePos(e) {
+            const rect = sigCanvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function getCanvasTouchPos(e) {
+            const rect = sigCanvas.getBoundingClientRect();
+            if (e.touches.length === 0) return { x: 0, y: 0 };
+            return {
+                x: e.touches[0].clientX - rect.left,
+                y: e.touches[0].clientY - rect.top
+            };
+        }
+
+        function drawSigLine(x1, y1, x2, y2) {
+            sigCtx.beginPath();
+            sigCtx.strokeStyle = '#000000';
+            sigCtx.lineWidth = 3;
+            sigCtx.lineCap = 'round';
+            sigCtx.lineJoin = 'round';
+            sigCtx.moveTo(x1, y1);
+            sigCtx.lineTo(x2, y2);
+            sigCtx.stroke();
+            sigCtx.closePath();
+        }
+
+        function openSignaturePad(index, e) {
+            if (e) e.preventDefault();
+            currentSigIndex = index;
+            
+            const modal = document.getElementById('sig-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            const title = index === 1 
+                ? (reportData.settings.signatureTitle1 || 'Auftragnehmer')
+                : (reportData.settings.signatureTitle2 || 'Auftraggeber');
+            document.getElementById('sig-modal-title').innerText = `${title} - Unterschrift`;
+
+            setTimeout(() => {
+                sigCanvas.width = sigCanvas.clientWidth;
+                sigCanvas.height = sigCanvas.clientHeight;
+                clearSignatureCanvas();
+            }, 100);
+        }
+
+        function closeSignaturePad(e) {
+            if (e) e.preventDefault();
+            const modal = document.getElementById('sig-modal');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        function clearSignatureCanvas(e) {
+            if (e) e.preventDefault();
+            sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+        }
+
+        function saveSignatureCanvas(e) {
+            if (e) e.preventDefault();
+            
+            const dataURL = sigCanvas.toDataURL('image/png');
+            const buffer = new Uint32Array(sigCtx.getImageData(0, 0, sigCanvas.width, sigCanvas.height).data.buffer);
+            const isBlank = !buffer.some(color => color !== 0);
+            
+            if (isBlank) {
+                alert("Bitte zeichnen Sie zuerst eine Unterschrift!");
+                return;
+            }
+            
+            if (currentSigIndex === 1) {
+                reportData.settings.signatureImage1 = dataURL;
+            } else {
+                reportData.settings.signatureImage2 = dataURL;
+            }
+            
+            saveToStorage();
+            updateSignaturePreviews();
+            closeSignaturePad();
+            lucide.createIcons();
+        }
+
+        async function uploadSignatureImage(index, event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                const MAX_W = 400, MAX_H = 150;
+                let bmp = await createImageBitmap(file);
+                let w = bmp.width, h = bmp.height;
+                const ratio = Math.min(MAX_W / w, MAX_H / h, 1);
+                w = Math.round(w * ratio);
+                h = Math.round(h * ratio);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+                bmp.close();
+
+                const imgData = canvas.toDataURL('image/png');
+                if (index === 1) {
+                    reportData.settings.signatureImage1 = imgData;
+                } else {
+                    reportData.settings.signatureImage2 = imgData;
+                }
+                saveToStorage();
+                updateSignaturePreviews();
+                lucide.createIcons();
+            } catch(e) {
+                alert('Fehler beim Laden der Unterschrift.');
+            }
+        }
+
+        function clearSignatureImage(index, event) {
+            if (event) event.preventDefault();
+            if (index === 1) {
+                reportData.settings.signatureImage1 = '';
+            } else {
+                reportData.settings.signatureImage2 = '';
+            }
+            saveToStorage();
+            updateSignaturePreviews();
+            lucide.createIcons();
+        }
+
+        function updateSignaturePreviews() {
+            for (let index = 1; index <= 2; index++) {
+                const imgData = index === 1 ? reportData.settings.signatureImage1 : reportData.settings.signatureImage2;
+                const preview = document.getElementById(`sig-preview-${index}`);
+                const placeholder = document.getElementById(`sig-placeholder-${index}`);
+                const clearBtn = document.getElementById(`btn-clear-sig-${index}`);
+                
+                if (imgData) {
+                    preview.src = imgData;
+                    preview.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                    clearBtn.classList.remove('hidden');
+                } else {
+                    preview.src = '';
+                    preview.classList.add('hidden');
+                    placeholder.classList.remove('hidden');
+                    clearBtn.classList.add('hidden');
+                }
+            }
+        }
+
+        // --- PHOTO EDITOR FUNCTIONS ---
+        let editorCanvas = null;
+        let editorCtx = null;
+        let editorImage = null;
+        let editorHistory = [];
+        let currentShape = null;
+        let editorTool = 'pen'; // 'pen' or 'arrow'
+        let editorColor = '#ef4444'; // Red default
+        let isEditorDrawing = false;
+
+        function initPhotoEditor() {
+            editorCanvas = document.getElementById('editor-canvas');
+            if (!editorCanvas) return;
+            editorCtx = editorCanvas.getContext('2d');
+            
+            // Mouse events
+            editorCanvas.addEventListener('mousedown', (e) => {
+                if (!editorImage) return;
+                isEditorDrawing = true;
+                const pos = getEditorCanvasCoords(e);
+                currentShape = {
+                    type: editorTool,
+                    color: editorColor,
+                    points: [pos]
+                };
+            });
+            editorCanvas.addEventListener('mousemove', (e) => {
+                if (!isEditorDrawing) return;
+                const pos = getEditorCanvasCoords(e);
+                if (editorTool === 'pen') {
+                    currentShape.points.push(pos);
+                } else if (editorTool === 'arrow') {
+                    currentShape.points[1] = pos;
+                }
+                redrawEditorCanvas();
+                drawShape(currentShape);
+            });
+            editorCanvas.addEventListener('mouseup', (e) => {
+                if (!isEditorDrawing) return;
+                isEditorDrawing = false;
+                if (!currentShape) return;
+                const pos = getEditorCanvasCoords(e);
+                if (editorTool === 'pen') {
+                    currentShape.points.push(pos);
+                    if (currentShape.points.length >= 2) {
+                        editorHistory.push(currentShape);
+                    }
+                } else if (editorTool === 'arrow') {
+                    currentShape.points[1] = pos;
+                    if (currentShape.points[0] && currentShape.points[1]) {
+                        editorHistory.push(currentShape);
+                    }
+                }
+                currentShape = null;
+                redrawEditorCanvas();
+            });
+            editorCanvas.addEventListener('mouseleave', () => {
+                // Fare canvas dışına çıkarsa mevcut şekli kaydet ve çizimi durdur
+                if (!isEditorDrawing || !currentShape) return;
+                isEditorDrawing = false;
+                if (editorTool === 'pen' && currentShape.points.length >= 2) {
+                    editorHistory.push(currentShape);
+                } else if (editorTool === 'arrow' && currentShape.points[0] && currentShape.points[1]) {
+                    editorHistory.push(currentShape);
+                }
+                currentShape = null;
+                redrawEditorCanvas();
+            });
+            // Global mouseup: fare canvas dışında bırakılırsa çizimi temizle
+            document.addEventListener('mouseup', () => {
+                if (isEditorDrawing) {
+                    isEditorDrawing = false;
+                    currentShape = null;
+                    redrawEditorCanvas();
+                }
+            });
+            
+            // Touch events for mobile
+            editorCanvas.addEventListener('touchstart', (e) => {
+                if (!editorImage) return;
+                isEditorDrawing = true;
+                const pos = getEditorCanvasCoords(e);
+                currentShape = {
+                    type: editorTool,
+                    color: editorColor,
+                    points: [pos]
+                };
+                e.preventDefault();
+            }, { passive: false });
+            editorCanvas.addEventListener('touchmove', (e) => {
+                if (!isEditorDrawing) return;
+                const pos = getEditorCanvasCoords(e);
+                if (editorTool === 'pen') {
+                    currentShape.points.push(pos);
+                } else if (editorTool === 'arrow') {
+                    currentShape.points[1] = pos;
+                }
+                redrawEditorCanvas();
+                drawShape(currentShape);
+                e.preventDefault();
+            }, { passive: false });
+            editorCanvas.addEventListener('touchend', (e) => {
+                if (!isEditorDrawing) return;
+                isEditorDrawing = false;
+                if (currentShape) {
+                    if (editorTool === 'pen' && currentShape.points.length >= 2) {
+                        editorHistory.push(currentShape);
+                    } else if (editorTool === 'arrow' && currentShape.points[0] && currentShape.points[1]) {
+                        editorHistory.push(currentShape);
+                    }
+                    currentShape = null;
+                }
+                redrawEditorCanvas();
+                e.preventDefault();
+            }, { passive: false });
+        }
+
+        function getEditorCanvasCoords(e) {
+            const rect = editorCanvas.getBoundingClientRect();
+            let clientX, clientY;
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            const x = (clientX - rect.left) * (editorCanvas.width / rect.width);
+            const y = (clientY - rect.top) * (editorCanvas.height / rect.height);
+            return { x, y };
+        }
+
+        function drawShape(shape) {
+            editorCtx.strokeStyle = shape.color;
+            editorCtx.fillStyle = shape.color;
+            editorCtx.lineWidth = 6;
+            editorCtx.lineCap = 'round';
+            editorCtx.lineJoin = 'round';
+            
+            if (shape.type === 'pen') {
+                if (shape.points.length < 2) return;
+                editorCtx.beginPath();
+                editorCtx.moveTo(shape.points[0].x, shape.points[0].y);
+                for (let i = 1; i < shape.points.length; i++) {
+                    editorCtx.lineTo(shape.points[i].x, shape.points[i].y);
+                }
+                editorCtx.stroke();
+                editorCtx.closePath();
+            } else if (shape.type === 'arrow') {
+                const p1 = shape.points[0];
+                const p2 = shape.points[1];
+                if (!p1 || !p2) return;
+                
+                const headlen = 24;
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const angle = Math.atan2(dy, dx);
+                
+                editorCtx.beginPath();
+                editorCtx.moveTo(p1.x, p1.y);
+                editorCtx.lineTo(p2.x, p2.y);
+                editorCtx.stroke();
+                
+                editorCtx.beginPath();
+                editorCtx.moveTo(p2.x, p2.y);
+                editorCtx.lineTo(p2.x - headlen * Math.cos(angle - Math.PI / 6), p2.y - headlen * Math.sin(angle - Math.PI / 6));
+                editorCtx.lineTo(p2.x - headlen * Math.cos(angle + Math.PI / 6), p2.y - headlen * Math.sin(angle + Math.PI / 6));
+                editorCtx.closePath();
+                editorCtx.fill();
+            }
+        }
+
+        function redrawEditorCanvas() {
+            if (!editorImage || !editorCanvas) return;
+            editorCtx.clearRect(0, 0, editorCanvas.width, editorCanvas.height);
+            editorCtx.drawImage(editorImage, 0, 0, editorCanvas.width, editorCanvas.height);
+            editorHistory.forEach(shape => {
+                drawShape(shape);
+            });
+        }
+
+        function openPhotoEditor(e) {
+            if (e) e.preventDefault();
+            if (!tempCompressedImage) {
+                alert("Bitte wählen Sie zuerst ein Foto aus!");
+                return;
+            }
+            
+            const modal = document.getElementById('photo-editor-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            lucide.createIcons();
+            
+            editorImage = new Image();
+            editorImage.onload = function() {
+                editorCanvas.width = editorImage.naturalWidth || editorImage.width;
+                editorCanvas.height = editorImage.naturalHeight || editorImage.height;
+                editorCanvas.style.maxWidth = '100%';
+                editorCanvas.style.maxHeight = '65vh';
+                
+                editorHistory = [];
+                currentShape = null;
+                
+                redrawEditorCanvas();
+            };
+            editorImage.src = tempCompressedImage;
+        }
+
+        function closePhotoEditor(e) {
+            if (e) e.preventDefault();
+            const modal = document.getElementById('photo-editor-modal');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+            // Durumu sıfırla
+            isEditorDrawing = false;
+            currentShape = null;
+            editorImage = null;
+        }
+
+        function setEditorTool(tool, e) {
+            if (e) e.preventDefault();
+            editorTool = tool;
+            
+            const penBtn = document.getElementById('tool-pen');
+            const arrowBtn = document.getElementById('tool-arrow');
+            
+            if (tool === 'pen') {
+                penBtn.className = "bg-blue-600 text-white border border-blue-600 px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition";
+                arrowBtn.className = "bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition";
+            } else {
+                penBtn.className = "bg-white text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition";
+                arrowBtn.className = "bg-blue-600 text-white border border-blue-600 px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1 transition";
+            }
+        }
+
+        function setEditorColor(color, e) {
+            if (e) e.preventDefault();
+            editorColor = color;
+            
+            const colors = {
+                '#ef4444': 'color-red',
+                '#22c55e': 'color-green',
+                '#3b82f6': 'color-blue',
+                '#eab308': 'color-yellow'
+            };
+            
+            for (const hex in colors) {
+                const btn = document.getElementById(colors[hex]);
+                if (!btn) continue;
+                if (hex === color) {
+                    btn.classList.add('ring-2');
+                    btn.classList.remove('ring-0');
+                } else {
+                    btn.classList.add('ring-0');
+                    btn.classList.remove('ring-2');
+                }
+            }
+        }
+
+        function undoEditorStroke(e) {
+            if (e) e.preventDefault();
+            editorHistory.pop();
+            redrawEditorCanvas();
+        }
+
+        function resetEditorDrawings(e) {
+            if (e) e.preventDefault();
+            if (confirm("Möchten Sie alle Markierungen von diesem Foto löschen?")) {
+                editorHistory = [];
+                redrawEditorCanvas();
+            }
+        }
+
+        function savePhotoEditor(e) {
+            if (e) e.preventDefault();
+            if (!editorImage) return;
+            
+            // Tüm çizimleri fotoğrafla birleştir ve kaydet
+            tempCompressedImage = editorCanvas.toDataURL('image/jpeg', 0.8);
+            
+            const preview = document.getElementById('image-preview');
+            preview.src = tempCompressedImage;
+            
+            // Durumu sıfırla ve kapat
+            editorHistory = [];
+            currentShape = null;
+            isEditorDrawing = false;
+            closePhotoEditor();
         }
     </script>
 </body>
