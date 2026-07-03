@@ -120,7 +120,7 @@ function loadFromStorage() {
         }
 
         updateSignaturePreviews();
-        renderPreview();
+        // renderPreview wird durch switchTab('tab-preview') ausgelöst
     }
 }
 
@@ -140,7 +140,7 @@ function saveToStorage() {
             console.error('Speicherfehler:', e);
         }
     }
-    renderPreview();
+    // renderPreview wird von switchTab oder explizit aufgerufen
 }
 
 // --- TAB-VERWALTUNG ---
@@ -155,9 +155,9 @@ function switchTab(tabId) {
     document.getElementById('btn-' + tabId).classList.remove('text-gray-500');
     document.getElementById('btn-' + tabId).classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
 
-    // Sobald die Vorschau-Seite sichtbar ist, Skalierung neu berechnen
+    // Vorschau: zuerst rendern, dann skalieren (Tab ist jetzt sichtbar → clientWidth korrekt)
     if (tabId === 'tab-preview') {
-        // requestAnimationFrame sichert, dass das DOM bereits gerendert ist
+        renderPreview();
         requestAnimationFrame(() => applyPageScale());
     }
 }
@@ -174,6 +174,7 @@ function saveSettings() {
     reportData.settings.mailBody    = document.getElementById('set-mail-body').value;
 
     saveToStorage();
+    renderPreview(); // Vorschau nach Einstellungen aktualisieren
     alert("Einstellungen gespeichert!");
     switchTab('tab-form');
 }
@@ -579,8 +580,11 @@ function applyPageScale() {
 
 function renderPreview() {
     const container = document.getElementById('report-preview');
+    if (!container) return;
     container.innerHTML = '';
-    document.getElementById('entry-count').innerText = reportData.entries.length;
+
+    const countEl = document.getElementById('entry-count');
+    if (countEl) countEl.innerText = reportData.entries.length;
 
     if (reportData.entries.length === 0) {
         container.innerHTML = '<p class="text-center text-gray-400 py-10">Noch keine Einträge hinzugefügt.</p>';
