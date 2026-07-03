@@ -36,6 +36,25 @@
             page-break-inside: avoid !important;
             break-inside: avoid-page !important;
             margin-top: 10px !important; /* Verhindert das Ankleben am oberen Rand der Folgeseiten */
+            padding-bottom: 8px !important;
+        }
+        
+        /* Styling-Anpassungen für PDF, um Umbrüche/Überlauf der Unterschriften zu verhindern */
+        .pdf-render-mode img.report-image {
+            max-height: 280px !important;
+        }
+        .pdf-render-mode .grid img.report-image {
+            max-height: 185px !important;
+        }
+        .pdf-render-mode .signature-block {
+            margin-top: 8px !important;
+            padding-top: 8px !important;
+        }
+        .pdf-render-mode .signature-box {
+            height: 80px !important;
+        }
+        .pdf-render-mode .signature-box img {
+            max-height: 48px !important;
         }
 
         /* Tab-Übergangsanimation */
@@ -90,19 +109,18 @@
                         <label for="entry-image-camera" class="flex flex-col items-center justify-center h-28 border-2 border-blue-300 border-dashed rounded-lg cursor-pointer bg-blue-50 hover:bg-blue-100">
                             <i data-lucide="camera" class="w-7 h-7 text-blue-500 mb-1"></i>
                             <span class="text-sm font-semibold text-blue-600">Kamera</span>
-                            <input id="entry-image-camera" type="file" accept="image/*" capture="environment" class="hidden" onchange="previewSelectedImage(event)" />
+                            <input id="entry-image-camera" type="file" accept="image/*" capture="environment" class="hidden" onchange="previewSelectedImages(event)" />
                         </label>
                         <!-- Galeri Butonu -->
                         <label for="entry-image-gallery" class="flex flex-col items-center justify-center h-28 border-2 border-green-300 border-dashed rounded-lg cursor-pointer bg-green-50 hover:bg-green-100">
                             <i data-lucide="image" class="w-7 h-7 text-green-500 mb-1"></i>
                             <span class="text-sm font-semibold text-green-600">Galerie</span>
-                            <input id="entry-image-gallery" type="file" accept="image/*" class="hidden" onchange="previewSelectedImage(event)" />
+                            <input id="entry-image-gallery" type="file" accept="image/*" multiple class="hidden" onchange="previewSelectedImages(event)" />
                         </label>
                     </div>
-                    <img id="image-preview" class="mt-2 hidden max-h-48 rounded object-cover mx-auto" />
-                    <button id="btn-edit-photo" onclick="openPhotoEditor(event)" class="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-bold text-sm flex justify-center items-center gap-2 hidden transition no-print">
-                        <i data-lucide="edit-3"></i> Foto bearbeiten / markieren
-                    </button>
+                    <div id="image-preview-container" class="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-3 hidden no-print">
+                        <!-- Vorschau-Bilder werden hier per JS geladen -->
+                    </div>
                 </div>
 
                 <button onclick="addEntry()" class="w-full bg-green-500 text-white py-3 rounded-lg font-bold text-lg flex justify-center items-center gap-2 hover:bg-green-600 transition">
@@ -353,8 +371,9 @@
                 .replace(/'/g, '&#039;');
         }
 
-        let tempCompressedImage = null;
+        let tempCompressedImages = [];
         let tempCoords = null; // Geçici coğrafi konum bilgisini tutar
+        let editingImageIndex = -1;
 
         // Daten beim Laden der Seite abrufen
         window.onload = () => {
@@ -543,9 +562,12 @@
                 document.getElementById('entry-text').value = '';
                 if(document.getElementById('entry-adresse')) document.getElementById('entry-adresse').value = '';
                 if(document.getElementById('entry-nvt')) document.getElementById('entry-nvt').value = '';
-                document.getElementById('image-preview').classList.add('hidden');
-                if (document.getElementById('btn-edit-photo')) document.getElementById('btn-edit-photo').classList.add('hidden');
-                tempCompressedImage = null;
+                const container = document.getElementById('image-preview-container');
+                if (container) {
+                    container.classList.add('hidden');
+                    container.innerHTML = '';
+                }
+                tempCompressedImages = [];
                 tempCoords = null;
                 alert("Daten erfolgreich zurückgesetzt.");
             }
@@ -553,111 +575,168 @@
 
         // --- BILDVERARBEITUNG UND ZEITSTEMPEL ---
         // createImageBitmap ile EXIF rotasyonu otomatik düzeltilir (Chrome 83+, iOS Safari 15+)
-        // Manuel EXIF parse gerekmez — modern mobil taıyıcılar zaten düzeltir.
-        async function previewSelectedImage(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+        async function compressImage(file) {
+            return new Promise(async (resolve, reject) => {
+                try {
+                    let source, drawWidth, drawHeight;
 
-            try {
-                let source, drawWidth, drawHeight;
-
-                if (typeof createImageBitmap !== 'undefined') {
-                    try {
-                        // imageOrientation:'from-image' → EXIF yönünü otomatik uygular
-                        source = await createImageBitmap(file, { imageOrientation: 'from-image' });
-                    } catch (e) {
-                        // Eski taıyıcı fallback (imageOrientation desteklenmiyorsa)
-                        source = await createImageBitmap(file);
-                    }
-                    drawWidth  = source.width;
-                    drawHeight = source.height;
-                } else {
-                    // createImageBitmap desteklemeyen çok eski taıyıcılar için FileReader fallback
-                    source = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = e => {
-                            const img = new Image();
-                            img.onload = () => resolve(img);
-                            img.onerror = reject;
-                            img.src = e.target.result;
-                        };
-                        reader.onerror = reject;
-                        reader.readAsDataURL(file);
-                    });
-                    drawWidth  = source.width;
-                    drawHeight = source.height;
-                }
-
-                // En-boy oranı korunarak hem genişlik hem yükseklik sınırla
-                const MAX_WIDTH  = 1200;
-                const MAX_HEIGHT = 900;
-                const scaleRatio = Math.min(
-                    drawWidth  > MAX_WIDTH  ? MAX_WIDTH  / drawWidth  : 1,
-                    drawHeight > MAX_HEIGHT ? MAX_HEIGHT / drawHeight : 1
-                );
-                if (scaleRatio < 1) {
-                    drawWidth  = Math.round(drawWidth  * scaleRatio);
-                    drawHeight = Math.round(drawHeight * scaleRatio);
-                }
-
-                const canvas = document.createElement('canvas');
-                canvas.width  = drawWidth;
-                canvas.height = drawHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(source, 0, 0, drawWidth, drawHeight);
-                if (source.close) source.close(); // ImageBitmap bellek serbest bırak
-
-                // Zeitstempel auf dem Foto
-                const now = new Date();
-                const timestamp = now.toLocaleDateString('de-DE') + ' ' + now.toLocaleTimeString('de-DE');
-                ctx.font        = `bold ${Math.round(drawWidth / 40)}px Arial`;
-                ctx.fillStyle   = 'white';
-                ctx.shadowColor = 'black';
-                ctx.shadowBlur  = 4;
-                ctx.shadowOffsetX = 2;
-                ctx.shadowOffsetY = 2;
-                ctx.textAlign   = 'right';
-                ctx.fillText(timestamp, drawWidth - 20, drawHeight - 20);
-                ctx.fillText(reportData.settings.project || '', drawWidth - 20, drawHeight - 52);
-
-                // Geolocation: Fotoğraf yüklendiğinde konumu al
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                            tempCoords = {
-                                latitude: position.coords.latitude,
-                                longitude: position.coords.longitude
+                    if (typeof createImageBitmap !== 'undefined') {
+                        try {
+                            source = await createImageBitmap(file, { imageOrientation: 'from-image' });
+                        } catch (e) {
+                            source = await createImageBitmap(file);
+                        }
+                        drawWidth  = source.width;
+                        drawHeight = source.height;
+                    } else {
+                        source = await new Promise((resolve2, reject2) => {
+                            const reader = new FileReader();
+                            reader.onload = e => {
+                                const img = new Image();
+                                img.onload = () => resolve2(img);
+                                img.onerror = reject2;
+                                img.src = e.target.result;
                             };
-                        },
-                        (error) => {
-                            console.warn("Konum alınamadı:", error.message);
-                            tempCoords = null;
-                        },
-                        { enableHighAccuracy: true, timeout: 5000 }
+                            reader.onerror = reject2;
+                            reader.readAsDataURL(file);
+                        });
+                        drawWidth  = source.width;
+                        drawHeight = source.height;
+                    }
+
+                    const MAX_WIDTH  = 1200;
+                    const MAX_HEIGHT = 900;
+                    const scaleRatio = Math.min(
+                        drawWidth  > MAX_WIDTH  ? MAX_WIDTH  / drawWidth  : 1,
+                        drawHeight > MAX_HEIGHT ? MAX_HEIGHT / drawHeight : 1
                     );
+                    if (scaleRatio < 1) {
+                        drawWidth  = Math.round(drawWidth  * scaleRatio);
+                        drawHeight = Math.round(drawHeight * scaleRatio);
+                    }
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width  = drawWidth;
+                    canvas.height = drawHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(source, 0, 0, drawWidth, drawHeight);
+                    if (source.close) source.close();
+
+                    const now = new Date();
+                    const timestamp = now.toLocaleDateString('de-DE') + ' ' + now.toLocaleTimeString('de-DE');
+                    ctx.font        = `bold ${Math.round(drawWidth / 40)}px Arial`;
+                    ctx.fillStyle   = 'white';
+                    ctx.shadowColor = 'black';
+                    ctx.shadowBlur  = 4;
+                    ctx.shadowOffsetX = 2;
+                    ctx.shadowOffsetY = 2;
+                    ctx.textAlign   = 'right';
+                    ctx.fillText(timestamp, drawWidth - 20, drawHeight - 20);
+                    ctx.fillText(reportData.settings.project || '', drawWidth - 20, drawHeight - 52);
+
+                    resolve(canvas.toDataURL('image/jpeg', 0.7));
+                } catch (err) {
+                    reject(err);
                 }
+            });
+        }
 
-                tempCompressedImage = canvas.toDataURL('image/jpeg', 0.7);
+        async function previewSelectedImages(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) return;
 
-                // Eğer fotoğraf yüklendiğinde hâlâ adres girilmemişse, otomatik olarak adresi çekmeye çalış
-                const currentAddrInput = document.getElementById('entry-adresse');
-                if (!currentAddrInput.value.trim()) {
-                    setTimeout(() => {
-                        if (tempCoords) {
+            // Geolocation: Fotoğraf yüklendiğinde konumu al
+            if (navigator.geolocation && !tempCoords) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        tempCoords = {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        };
+                        const currentAddrInput = document.getElementById('entry-adresse');
+                        if (!currentAddrInput.value.trim()) {
                             getAddressFromCoords(tempCoords.latitude, tempCoords.longitude);
                         }
-                    }, 800);
-                }
-
-                const preview = document.getElementById('image-preview');
-                preview.src = tempCompressedImage;
-                preview.classList.remove('hidden');
-                if (document.getElementById('btn-edit-photo')) document.getElementById('btn-edit-photo').classList.remove('hidden');
-
-            } catch (err) {
-                console.error('Bildfehler:', err);
-                alert('Fehler beim Laden des Bildes. Bitte erneut versuchen.');
+                    },
+                    (error) => {
+                        console.warn("Konum alınamadı:", error.message);
+                    },
+                    { enableHighAccuracy: true, timeout: 5000 }
+                );
             }
+
+            for (let i = 0; i < files.length; i++) {
+                try {
+                    const dataUrl = await compressImage(files[i]);
+                    tempCompressedImages.push(dataUrl);
+                } catch (err) {
+                    console.error('Bildfehler:', err);
+                }
+            }
+
+            renderFormImagePreviews();
+        }
+
+        function renderFormImagePreviews() {
+            const container = document.getElementById('image-preview-container');
+            if (!container) return;
+
+            if (tempCompressedImages.length === 0) {
+                container.innerHTML = '';
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            let html = '';
+            tempCompressedImages.forEach((img, index) => {
+                html += `
+                <div class="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50 h-32 flex items-center justify-center">
+                    <img src="${img}" class="max-h-full max-w-full object-contain" />
+                    <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button type="button" onclick="editFormImage(${index}, event)" class="bg-blue-600 text-white p-1.5 rounded-full hover:bg-blue-700 transition" title="Bearbeiten">
+                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                        </button>
+                        <button type="button" onclick="deleteFormImage(${index}, event)" class="bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700 transition" title="Löschen">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+                `;
+            });
+            container.innerHTML = html;
+            lucide.createIcons();
+        }
+
+        function deleteFormImage(index, event) {
+            if (event) event.preventDefault();
+            tempCompressedImages.splice(index, 1);
+            renderFormImagePreviews();
+        }
+
+        function editFormImage(index, event) {
+            if (event) event.preventDefault();
+            editingImageIndex = index;
+            
+            const modal = document.getElementById('photo-editor-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            lucide.createIcons();
+            
+            editorImage = new Image();
+            editorImage.onload = function() {
+                editorCanvas.width = editorImage.naturalWidth || editorImage.width;
+                editorCanvas.height = editorImage.naturalHeight || editorImage.height;
+                editorCanvas.style.maxWidth = '100%';
+                editorCanvas.style.maxHeight = '65vh';
+                
+                editorHistory = [];
+                currentShape = null;
+                
+                redrawEditorCanvas();
+            };
+            editorImage.src = tempCompressedImages[index];
         }
 
         // --- OTOMATİK ADRES BULMA (Reverse Geocoding) ---
@@ -744,7 +823,7 @@
                 return;
             }
 
-            if (!tempCompressedImage) {
+            if (tempCompressedImages.length === 0) {
                 alert("Bitte machen Sie zuerst ein Foto oder fügen Sie eines hinzu!");
                 return;
             }
@@ -756,7 +835,8 @@
                 text:    text,
                 adresse: adresse,
                 nvt:     nvt,
-                image:   tempCompressedImage,
+                image:   tempCompressedImages[0], // Abwärtskompatibilität
+                images:  [...tempCompressedImages],
                 date:    dateStr,
                 coords:  tempCoords ? { ...tempCoords } : null
             });
@@ -767,9 +847,12 @@
             document.getElementById('entry-text').value    = '';
             document.getElementById('entry-adresse').value = '';
             document.getElementById('entry-nvt').value     = '';
-            document.getElementById('image-preview').classList.add('hidden');
-            if (document.getElementById('btn-edit-photo')) document.getElementById('btn-edit-photo').classList.add('hidden');
-            tempCompressedImage = null;
+            const previewContainer = document.getElementById('image-preview-container');
+            if (previewContainer) {
+                previewContainer.classList.add('hidden');
+                previewContainer.innerHTML = '';
+            }
+            tempCompressedImages = [];
             tempCoords = null;
 
             // Her iki input'u sıfırla (Clone-Trick für mobile Browser)
@@ -814,25 +897,28 @@
                 const dateHtml = `<div class="col-span-1"><span class="font-bold block border-b border-gray-300">Datum:</span><p class="mt-1 text-xs">${entry.date}</p></div>`;
 
                 const mapLink = entry.coords 
-                    ? `<div class="mt-2 text-xs text-blue-600 font-semibold no-print-link">
-                        <a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" class="flex items-center gap-1 hover:underline">
+                    ? `<div class="mt-2 text-xs text-blue-600 font-semibold no-print-link text-center w-full">
+                        <a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" class="inline-flex items-center gap-1 hover:underline justify-center">
                             📍 Auf Google Maps anzeigen
                         </a>
                        </div>` 
                     : '';
 
-                html += `
-                <div class="page-container avoid-break border border-gray-200 mb-8 pb-4 ${index > 0 ? 'page-break-entry' : ''}">
-                    <!-- Kopfzeile: Logo + Firma + Titel -->
-                    <div class="border-b-2 border-black mb-4 pb-2 p-4 flex justify-between items-start">
-                        <div>
-                            <h2 class="font-bold text-lg uppercase">${headerTitle}</h2>
-                            ${firmaNameHtml}
-                        </div>
-                        ${logoHtml}
-                    </div>
+                const entryImages = entry.images || (entry.image ? [entry.image] : []);
+                let contentHtml = '';
 
-                    <!-- PDF-Inhalt (Links Text - Rechts Bild) -->
+                if (entryImages.length <= 1) {
+                    // Einzelfoto: Nebeneinander-Layout (Text links, Bild rechts)
+                    const imgUrl = entryImages[0] || '';
+                    const imageMarkup = imgUrl 
+                        ? (entry.coords 
+                            ? `<a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" title="In Google Maps öffnen" class="w-full flex justify-center">
+                                <img src="${imgUrl}" class="report-image max-w-full h-auto object-scale-down rounded" style="max-height:300px; display:block;" />
+                               </a>`
+                            : `<img src="${imgUrl}" class="report-image max-w-full h-auto object-scale-down rounded" style="max-height:300px; display:block;" />`)
+                        : '';
+
+                    contentHtml = `
                     <div class="flex flex-col sm:flex-row gap-4 p-4">
                         <!-- Linke Spalte -->
                         <div class="w-full sm:w-1/3 flex flex-col gap-4">
@@ -855,20 +941,73 @@
                         <!-- Rechte Spalte: Bild -->
                         <div class="w-full sm:w-2/3 flex flex-col items-center justify-center">
                             <div class="w-full flex items-center justify-center bg-gray-50 rounded border p-1" style="margin-top: 10px;">
-                                ${entry.coords 
-                                    ? `<a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" title="In Google Maps öffnen">
-                                        <img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:500px; display:block;" />
-                                       </a>`
-                                    : `<img src="${entry.image}" class="max-w-full h-auto object-scale-down rounded" style="max-height:500px; display:block;" />`
-                                }
+                                ${imageMarkup}
                             </div>
                             ${mapLink}
                         </div>
+                    </div>`;
+                } else {
+                    // Mehrere Fotos: Adresse, NVT, Datum & Befund oben; Bilder im Grid darunter
+                    let gridClass = 'grid-cols-2';
+                    if (entryImages.length === 3 || entryImages.length >= 5) {
+                        gridClass = 'grid-cols-3';
+                    }
+
+                    const imagesMarkup = entryImages.map(imgUrl => `
+                        <div class="flex items-center justify-center bg-gray-55 rounded border p-1">
+                            ${entry.coords 
+                                ? `<a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" title="In Google Maps öffnen" class="w-full flex justify-center">
+                                    <img src="${imgUrl}" class="report-image max-w-full h-auto object-scale-down rounded" style="max-height:200px; display:block;" />
+                                   </a>`
+                                : `<img src="${imgUrl}" class="report-image max-w-full h-auto object-scale-down rounded" style="max-height:200px; display:block;" />`
+                            }
+                        </div>
+                    `).join('');
+
+                    contentHtml = `
+                    <div class="p-4 flex flex-col gap-4">
+                        <!-- Adresse, NVT, Datum written 1 time at the top -->
+                        <div class="grid grid-cols-3 gap-4 border-b border-gray-200 pb-3">
+                            ${adresseHtml}
+                            ${nvtHtml}
+                            ${dateHtml}
+                        </div>
+                        
+                        <!-- Befund / Beschreibung below information -->
+                        <div>
+                            <span class="font-bold block border-b border-gray-300">Befund / Beschreibung:</span>
+                            <p class="mt-1 whitespace-pre-wrap text-xs sm:text-sm">${escapeHtml(entry.text)}</p>
+                        </div>
+                        
+                        <!-- Grid of multiple images -->
+                        <div class="grid ${gridClass} gap-3 mt-2">
+                            ${imagesMarkup}
+                        </div>
+                        
+                        ${mapLink}
+                        
+                        <div class="mt-4 pt-2 flex justify-between items-center text-xs text-gray-400">
+                            <span>Seite: ${index + 1} / ${reportData.entries.length}</span>
+                        </div>
+                    </div>`;
+                }
+
+                html += `
+                <div class="page-container avoid-break border border-gray-200 mb-8 pb-4 ${index > 0 ? 'page-break-entry' : ''}">
+                    <!-- Kopfzeile: Logo + Firma + Titel -->
+                    <div class="border-b-2 border-black mb-2 pb-2 p-4 flex justify-between items-start">
+                        <div>
+                            <h2 class="font-bold text-lg uppercase">${headerTitle}</h2>
+                            ${firmaNameHtml}
+                        </div>
+                        ${logoHtml}
                     </div>
+
+                    ${contentHtml}
                     
                     <!-- Unterschriftenbereich -->
-                    <div class="mt-6 pt-4 border-t border-gray-300 grid grid-cols-2 gap-8 px-8 avoid-break">
-                        <div class="text-center flex flex-col justify-end items-center h-28">
+                    <div class="mt-4 pt-4 border-t border-gray-300 grid grid-cols-2 gap-8 px-8 avoid-break signature-block">
+                        <div class="text-center flex flex-col justify-end items-center h-28 signature-box">
                             <p class="text-xs text-gray-500 font-semibold mb-1">${escapeHtml(reportData.settings.signatureTitle1) || 'Auftragnehmer'}</p>
                             <div class="h-16 flex items-center justify-center">
                                 ${reportData.settings.signatureImage1 
@@ -879,7 +1018,7 @@
                             <div class="border-t border-gray-400 w-3/4 mt-1"></div>
                             <p class="text-[10px] text-gray-400 mt-1">Unterschrift / Stempel</p>
                         </div>
-                        <div class="text-center flex flex-col justify-end items-center h-28">
+                        <div class="text-center flex flex-col justify-end items-center h-28 signature-box">
                             <p class="text-xs text-gray-500 font-semibold mb-1">${escapeHtml(reportData.settings.signatureTitle2) || 'Auftraggeber'}</p>
                             <div class="h-16 flex items-center justify-center">
                                 ${reportData.settings.signatureImage2 
@@ -915,7 +1054,7 @@
                 image:        { type: 'jpeg', quality: 0.95 },
                 html2canvas:  { scale: 2, useCORS: true, logging: false },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-                pageBreak:    { mode: 'avoid-all' }
+                pageBreak:    { mode: ['css', 'legacy'] }
             };
 
             // HTML in PDF konvertieren und herunterladen
@@ -961,7 +1100,14 @@
                 const element = document.getElementById('report-preview');
                 element.classList.add('pdf-render-mode');
                 
-                const opt = { margin: 10, filename: 'bericht.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+                const opt = { 
+                    margin: [15, 12, 15, 12], 
+                    filename: 'bericht.pdf', 
+                    image: { type: 'jpeg', quality: 0.98 }, 
+                    html2canvas: { scale: 2, useCORS: true, logging: false }, 
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pageBreak: { mode: ['css', 'legacy'] }
+                };
                 const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
                 element.classList.remove('pdf-render-mode');
 
@@ -1365,30 +1511,11 @@
 
         function openPhotoEditor(e) {
             if (e) e.preventDefault();
-            if (!tempCompressedImage) {
+            if (tempCompressedImages.length === 0) {
                 alert("Bitte wählen Sie zuerst ein Foto aus!");
                 return;
             }
-            
-            const modal = document.getElementById('photo-editor-modal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-            
-            lucide.createIcons();
-            
-            editorImage = new Image();
-            editorImage.onload = function() {
-                editorCanvas.width = editorImage.naturalWidth || editorImage.width;
-                editorCanvas.height = editorImage.naturalHeight || editorImage.height;
-                editorCanvas.style.maxWidth = '100%';
-                editorCanvas.style.maxHeight = '65vh';
-                
-                editorHistory = [];
-                currentShape = null;
-                
-                redrawEditorCanvas();
-            };
-            editorImage.src = tempCompressedImage;
+            editFormImage(0, e);
         }
 
         function closePhotoEditor(e) {
@@ -1460,16 +1587,18 @@
             if (e) e.preventDefault();
             if (!editorImage) return;
             
-            // Tüm çizimleri fotoğrafla birleştir ve kaydet
-            tempCompressedImage = editorCanvas.toDataURL('image/jpeg', 0.8);
+            const editedDataUrl = editorCanvas.toDataURL('image/jpeg', 0.8);
             
-            const preview = document.getElementById('image-preview');
-            preview.src = tempCompressedImage;
+            if (editingImageIndex !== -1) {
+                tempCompressedImages[editingImageIndex] = editedDataUrl;
+                renderFormImagePreviews();
+            }
             
             // Durumu sıfırla ve kapat
             editorHistory = [];
             currentShape = null;
             isEditorDrawing = false;
+            editingImageIndex = -1;
             closePhotoEditor();
         }
     </script>
