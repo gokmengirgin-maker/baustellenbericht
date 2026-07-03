@@ -37,6 +37,9 @@
             break-inside: avoid-page !important;
             margin-top: 10px !important; /* Verhindert das Ankleben am oberen Rand der Folgeseiten */
             padding-bottom: 8px !important;
+            min-height: 258mm !important; /* Streckt den Container, um die A4-Seite voll auszufüllen */
+            display: flex !important;
+            flex-direction: column !important;
         }
         
         /* Styling-Anpassungen für PDF, um Umbrüche/Überlauf der Unterschriften zu verhindern */
@@ -47,7 +50,7 @@
             max-height: 185px !important;
         }
         .pdf-render-mode .signature-block {
-            margin-top: 8px !important;
+            margin-top: auto !important; /* Drückt die Unterschriften an das Seitenende */
             padding-top: 8px !important;
         }
         .pdf-render-mode .signature-box {
