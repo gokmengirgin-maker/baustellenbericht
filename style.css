@@ -31,6 +31,19 @@
     break-after: page;
 }
 
+/* PDF-Erstellungsmodus: Alle Abstände und Hintergründe des Containers entfernen */
+.pdf-generation-mode {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+}
+.pdf-generation-mode .pdf-page {
+    box-shadow: none !important;
+    margin: 0 !important;
+    border: none !important;
+}
+
 /* Print CSS overrides */
 @media print {
     body * { visibility: hidden; }

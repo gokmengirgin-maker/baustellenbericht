@@ -720,6 +720,8 @@ function generatePDF() {
     }
 
     const element = document.getElementById('report-preview');
+    element.classList.add('pdf-generation-mode');
+    
     const now = new Date();
     const timeStamp = now.toLocaleDateString('de-DE') + '_' + now.toTimeString().split(' ')[0].replace(/:/g, '-');
     
@@ -733,7 +735,12 @@ function generatePDF() {
         pageBreak:    { mode: ['css', 'legacy'] }
     };
 
-    html2pdf().set(opt).from(element).save();
+    html2pdf().set(opt).from(element).save().then(() => {
+        element.classList.remove('pdf-generation-mode');
+    }).catch(err => {
+        console.error(err);
+        element.classList.remove('pdf-generation-mode');
+    });
 }
 
 // --- PER OUTLOOK / MAIL SENDEN (MAILTO) ---
@@ -767,6 +774,7 @@ async function nativeShare() {
     
     try {
         const element = document.getElementById('report-preview');
+        element.classList.add('pdf-generation-mode');
         
         const opt = { 
             margin: 0, 
@@ -777,6 +785,7 @@ async function nativeShare() {
             pageBreak: { mode: ['css', 'legacy'] }
         };
         const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+        element.classList.remove('pdf-generation-mode');
 
         const file = new File([pdfBlob], `Bericht_${Date.now()}.pdf`, { type: "application/pdf" });
 
@@ -792,6 +801,8 @@ async function nativeShare() {
     } catch (error) {
         console.error("Teilen-Fehler:", error);
         alert("Beim Teilen ist ein Fehler aufgetreten.");
+        const element = document.getElementById('report-preview');
+        if (element) element.classList.remove('pdf-generation-mode');
     }
 }
 
