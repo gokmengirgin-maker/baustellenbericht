@@ -39,7 +39,15 @@ window.onload = () => {
     lucide.createIcons();
 
     loadFromStorage();
-    
+
+    // Skalierung bei Fenster-/Orientierungsänderung neu berechnen
+    window.addEventListener('resize', () => {
+        const previewTab = document.getElementById('tab-preview');
+        if (previewTab && previewTab.classList.contains('active')) {
+            applyPageScale();
+        }
+    });
+
     // Teilen-Button anzeigen, wenn iOS und Share-API verfügbar sind
     if (navigator.share) {
         document.getElementById('native-share-btn').classList.remove('hidden');
@@ -142,10 +150,16 @@ function switchTab(tabId) {
         btn.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
         btn.classList.add('text-gray-500');
     });
-    
+
     document.getElementById(tabId).classList.add('active');
     document.getElementById('btn-' + tabId).classList.remove('text-gray-500');
     document.getElementById('btn-' + tabId).classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+
+    // Sobald die Vorschau-Seite sichtbar ist, Skalierung neu berechnen
+    if (tabId === 'tab-preview') {
+        // requestAnimationFrame sichert, dass das DOM bereits gerendert ist
+        requestAnimationFrame(() => applyPageScale());
+    }
 }
 
 // --- EINSTELLUNGEN ---
