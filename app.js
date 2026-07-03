@@ -501,12 +501,15 @@ function addEntry() {
     const now = new Date();
     const dateStr = now.toLocaleDateString('de-DE') + ' ' + now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
+    const MAX_PHOTOS = 4;
+    const imagesToSave = tempCompressedImages.slice(0, MAX_PHOTOS);
+
     reportData.entries.push({
         text:    text,
         adresse: adresse,
         nvt:     nvt,
-        image:   tempCompressedImages[0], // Abwärtskompatibilität
-        images:  [...tempCompressedImages],
+        image:   imagesToSave[0], // Abwärtskompatibilität
+        images:  imagesToSave,
         date:    dateStr,
         coords:  tempCoords ? { ...tempCoords } : null
     });
