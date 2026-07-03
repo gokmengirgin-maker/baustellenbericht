@@ -623,6 +623,11 @@ function renderPreview() {
     createNewPage();
 
     reportData.entries.forEach((entry, entryIndex) => {
+        // Jeder Eintrag beginnt immer auf einer neuen Seite
+        if (entryIndex > 0) {
+            createNewPage();
+        }
+
         const entryImages = entry.images || (entry.image ? [entry.image] : []);
 
         // 1. Metadata
@@ -652,13 +657,7 @@ function renderPreview() {
         currentContentArea.appendChild(metadataDiv);
         currentContentArea.appendChild(descriptionDiv);
 
-        if (currentPage.scrollHeight > 1123) {
-            currentContentArea.removeChild(metadataDiv);
-            currentContentArea.removeChild(descriptionDiv);
-            createNewPage();
-            currentContentArea.appendChild(metadataDiv);
-            currentContentArea.appendChild(descriptionDiv);
-        }
+
 
         // 3. Bilder
         const imagesDiv = document.createElement('div');
