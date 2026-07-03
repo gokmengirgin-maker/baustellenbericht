@@ -101,6 +101,7 @@ function loadFromStorage() {
         if (!reportData.settings.signatureTitle2) reportData.settings.signatureTitle2 = 'Auftraggeber';
         if (reportData.settings.signatureImage1 === undefined) reportData.settings.signatureImage1 = '';
         if (reportData.settings.signatureImage2 === undefined) reportData.settings.signatureImage2 = '';
+        if (!reportData.settings.nvtLabel) reportData.settings.nvtLabel = 'NVT:';
 
         document.getElementById('set-project').value      = reportData.settings.project || '';
         document.getElementById('set-sig-title-1').value = reportData.settings.signatureTitle1 || '';
@@ -110,6 +111,7 @@ function loadFromStorage() {
         document.getElementById('set-firma-name').value   = reportData.settings.firmaName || '';
         document.getElementById('set-mail-subject').value = reportData.settings.mailSubject || 'Baustellenbericht: {projekt}';
         document.getElementById('set-mail-body').value    = reportData.settings.mailBody || 'Hallo,\n\nanbei finden Sie den aktuellen Baustellenbericht als PDF im Anhang.\n\nViele Grüße';
+        document.getElementById('set-nvt-label').value    = reportData.settings.nvtLabel || 'NVT:';
 
         // Logo varsa göster
         if (reportData.settings.firmaLogo) {
@@ -120,6 +122,7 @@ function loadFromStorage() {
         }
 
         updateSignaturePreviews();
+        updateDynamicLabels();
         // renderPreview wird durch switchTab('tab-preview') ausgelöst
     }
 }
@@ -162,6 +165,15 @@ function switchTab(tabId) {
     }
 }
 
+// --- DYNAMISCHE METADATEN-BESCHRIFTUNGEN ---
+function updateDynamicLabels() {
+    const labelText = reportData.settings.nvtLabel || 'NVT:';
+    const formLabel = document.getElementById('label-entry-nvt');
+    if (formLabel) {
+        formLabel.innerText = labelText;
+    }
+}
+
 // --- EINSTELLUNGEN ---
 function saveSettings() {
     reportData.settings.project     = document.getElementById('set-project').value;
@@ -172,8 +184,10 @@ function saveSettings() {
     reportData.settings.firmaName   = document.getElementById('set-firma-name').value;
     reportData.settings.mailSubject = document.getElementById('set-mail-subject').value;
     reportData.settings.mailBody    = document.getElementById('set-mail-body').value;
+    reportData.settings.nvtLabel    = document.getElementById('set-nvt-label').value || 'NVT:';
 
     saveToStorage();
+    updateDynamicLabels();
     renderPreview(); // Vorschau nach Einstellungen aktualisieren
     alert("Einstellungen gespeichert!");
     switchTab('tab-form');
@@ -654,8 +668,9 @@ function renderPreview() {
         const adresseHtml = entry.adresse
             ? `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">Adresse:</span><p class="mt-0.5 text-[11px] break-words">${escapeHtml(entry.adresse)}</p></div>`
             : '<div class="col-span-1"></div>';
+        const nvtLabel = reportData.settings.nvtLabel || 'NVT:';
         const nvtHtml = entry.nvt
-            ? `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">NVT:</span><p class="mt-0.5 text-[11px]">${escapeHtml(entry.nvt)}</p></div>`
+            ? `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">${escapeHtml(nvtLabel)}</span><p class="mt-0.5 text-[11px]">${escapeHtml(entry.nvt)}</p></div>`
             : '<div class="col-span-1"></div>';
         const dateHtml = `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">Datum:</span><p class="mt-0.5 text-[11px]">${entry.date}</p></div>`;
         metadataDiv.innerHTML = `
