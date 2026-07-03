@@ -293,6 +293,20 @@ async function previewSelectedImages(event) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
+    const MAX_PHOTOS = 4;
+
+    if (tempCompressedImages.length >= MAX_PHOTOS) {
+        alert(`Maximal ${MAX_PHOTOS} Fotos pro Eintrag erlaubt. Bitte löschen Sie zuerst ein Foto.`);
+        return;
+    }
+
+    const remaining = MAX_PHOTOS - tempCompressedImages.length;
+    const filesToLoad = Math.min(files.length, remaining);
+
+    if (files.length > remaining) {
+        alert(`Es werden nur ${filesToLoad} von ${files.length} Fotos hinzugefügt (Limit: ${MAX_PHOTOS} Fotos pro Eintrag).`);
+    }
+
     if (navigator.geolocation && !tempCoords) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -312,7 +326,7 @@ async function previewSelectedImages(event) {
         );
     }
 
-    for (let i = 0; i < files.length; i++) {
+    for (let i = 0; i < filesToLoad; i++) {
         try {
             const dataUrl = await compressImage(files[i]);
             tempCompressedImages.push(dataUrl);
@@ -324,6 +338,7 @@ async function previewSelectedImages(event) {
     renderFormImagePreviews();
 }
 
+
 function renderFormImagePreviews() {
     const container = document.getElementById('image-preview-container');
     if (!container) return;
@@ -334,11 +349,22 @@ function renderFormImagePreviews() {
         return;
     }
 
+    const MAX_PHOTOS = 4;
+    const count = tempCompressedImages.length;
+    const atLimit = count >= MAX_PHOTOS;
+
     container.classList.remove('hidden');
-    let html = '';
+
+    // Zähler-Badge oben
+    let html = `
+        <div class="col-span-full flex items-center justify-between mb-1">
+            <span class="text-xs font-semibold text-gray-600">Fotos: <span class="${atLimit ? 'text-red-500' : 'text-green-600'}">${count} / ${MAX_PHOTOS}</span></span>
+            ${atLimit ? '<span class="text-xs text-red-500 font-semibold">⚠ Limit erreicht</span>' : `<span class="text-xs text-gray-400">${MAX_PHOTOS - count} Slot(s) frei</span>`}
+        </div>`;
+
     tempCompressedImages.forEach((img, index) => {
         html += `
-        <div class="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-55 h-32 flex items-center justify-center">
+        <div class="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-50 h-32 flex items-center justify-center">
             <img src="${img}" class="max-h-full max-w-full object-contain" />
             <div class="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button type="button" onclick="editFormImage(${index}, event)" class="bg-blue-600 text-white p-1.5 rounded-full hover:bg-blue-700 transition" title="Bearbeiten">
@@ -348,12 +374,12 @@ function renderFormImagePreviews() {
                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>
             </div>
-        </div>
-        `;
+        </div>`;
     });
     container.innerHTML = html;
     lucide.createIcons();
 }
+
 
 function deleteFormImage(index, event) {
     if (event) event.preventDefault();
@@ -510,7 +536,30 @@ function addEntry() {
     switchTab('tab-preview');
 }
 
-// --- BERICHT-VORSCHAU (Yöntem 2: JavaScript Page Builder) ---
+// --- BERICHT-VORSCHAU (Yöntem 2: JavaScript Page Builder mit Skalierung) ---
+
+// Skalierungsfunktion: passt alle Seiten an die aktuelle Container-Breite an
+function applyPageScale() {
+    const container = document.getElementById('report-preview');
+    if (!container) return;
+    const wrappers = container.querySelectorAll('.pdf-page-wrapper');
+    if (wrappers.length === 0) return;
+
+    // PDF-Generation mode: keine Skalierung
+    if (container.classList.contains('pdf-generation-mode')) return;
+
+    // Verfügbare Breite des Containers (minus Padding)
+    const availableWidth = container.clientWidth - 24; // 12px padding links + rechts
+    const scale = Math.min(1, availableWidth / 794);
+
+    wrappers.forEach(wrapper => {
+        const page = wrapper.querySelector('.pdf-page');
+        if (!page) return;
+        page.style.transform = `scale(${scale})`;
+        wrapper.style.height = Math.round(1123 * scale) + 'px';
+    });
+}
+
 function renderPreview() {
     const container = document.getElementById('report-preview');
     container.innerHTML = '';
@@ -522,22 +571,30 @@ function renderPreview() {
     }
 
     let pageCount = 0;
+    let currentPage = null;
+    let currentWrapper = null;
+    let currentContentArea = null;
 
     function createNewPage() {
         pageCount++;
+
+        // Wrapper-Div (für Skalierung)
+        const wrapper = document.createElement('div');
+        wrapper.className = 'pdf-page-wrapper';
+
+        // Eigentliche A4-Seite
         const page = document.createElement('div');
         page.className = 'pdf-page';
-        
-        // Header HTML
+
         const headerTitle = (reportData.settings.headerTitle || 'Mehrkosten - {projekt}')
             .replace('{projekt}', reportData.settings.project || '');
         const logoHtml = reportData.settings.firmaLogo
             ? `<img src="${reportData.settings.firmaLogo}" style="max-height:50px;max-width:150px;object-fit:contain;" />` : '';
         const firmaNameHtml = reportData.settings.firmaName
             ? `<p class="text-xs text-gray-600 mt-0.5">${escapeHtml(reportData.settings.firmaName)}</p>` : '';
-        
+
         page.innerHTML = `
-            <div class="pdf-header border-b-2 border-black mb-3 pb-1 flex justify-between items-start no-print-title">
+            <div class="pdf-header border-b-2 border-black mb-3 pb-1 flex justify-between items-start">
                 <div>
                     <h2 class="font-bold text-base uppercase">${headerTitle}</h2>
                     ${firmaNameHtml}
@@ -549,114 +606,96 @@ function renderPreview() {
                 <span class="page-num">Seite ${pageCount}</span>
             </div>
         `;
-        
-        container.appendChild(page);
-        return page;
+
+        wrapper.appendChild(page);
+        container.appendChild(wrapper);
+
+        currentPage = page;
+        currentWrapper = wrapper;
+        currentContentArea = page.querySelector('.pdf-content');
+
+        return { page, wrapper };
     }
 
-    let currentPage = createNewPage();
-    let currentContentArea = currentPage.querySelector('.pdf-content');
+    createNewPage();
 
     reportData.entries.forEach((entry, entryIndex) => {
         const entryImages = entry.images || (entry.image ? [entry.image] : []);
-        
-        // 1. Metadata container
+
+        // 1. Metadata
         const metadataDiv = document.createElement('div');
         metadataDiv.className = 'entry-metadata';
         const adresseHtml = entry.adresse
-            ? `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">Adresse:</span><p class="mt-0.5 text-[11px] break-words">${escapeHtml(entry.adresse)}</p></div>` 
+            ? `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">Adresse:</span><p class="mt-0.5 text-[11px] break-words">${escapeHtml(entry.adresse)}</p></div>`
             : '<div class="col-span-1"></div>';
         const nvtHtml = entry.nvt
-            ? `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">NVT:</span><p class="mt-0.5 text-[11px]">${escapeHtml(entry.nvt)}</p></div>` 
+            ? `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">NVT:</span><p class="mt-0.5 text-[11px]">${escapeHtml(entry.nvt)}</p></div>`
             : '<div class="col-span-1"></div>';
         const dateHtml = `<div class="col-span-1"><span class="font-bold block border-b border-gray-200 text-xs">Datum:</span><p class="mt-0.5 text-[11px]">${entry.date}</p></div>`;
-        
         metadataDiv.innerHTML = `
             <div class="grid grid-cols-3 gap-3 border-b border-gray-200 pb-2">
-                ${adresseHtml}
-                ${nvtHtml}
-                ${dateHtml}
-            </div>
-        `;
-        
-        // 2. Description container
+                ${adresseHtml}${nvtHtml}${dateHtml}
+            </div>`;
+
+        // 2. Beschreibung
         const descriptionDiv = document.createElement('div');
         descriptionDiv.className = 'entry-description';
         descriptionDiv.innerHTML = `
             <div>
                 <span class="font-bold block border-b border-gray-200 text-xs">Befund / Beschreibung:</span>
                 <p class="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-gray-700">${escapeHtml(entry.text)}</p>
-            </div>
-        `;
+            </div>`;
 
         currentContentArea.appendChild(metadataDiv);
         currentContentArea.appendChild(descriptionDiv);
 
-        // Check if metadata + description overflows page height
         if (currentPage.scrollHeight > 1123) {
             currentContentArea.removeChild(metadataDiv);
             currentContentArea.removeChild(descriptionDiv);
-            
-            currentPage = createNewPage();
-            currentContentArea = currentPage.querySelector('.pdf-content');
-            
+            createNewPage();
             currentContentArea.appendChild(metadataDiv);
             currentContentArea.appendChild(descriptionDiv);
         }
 
-        // 3. Images container
+        // 3. Bilder
         const imagesDiv = document.createElement('div');
         imagesDiv.className = 'entry-images mt-1';
-        
+
+        // Max 4 Fotos pro Eintrag (Sicherheitsnetz)
+        const displayImages = entryImages.slice(0, 4);
+
         let gridClass = 'grid-cols-2';
-        let imgMaxHeight = '280px';
-        
-        if (entryImages.length === 1) {
-            gridClass = 'grid-cols-1';
-            imgMaxHeight = '420px';
-        } else if (entryImages.length === 3 || entryImages.length >= 5) {
-            gridClass = 'grid-cols-3';
-            imgMaxHeight = '180px';
-        } else {
-            gridClass = 'grid-cols-2';
-            imgMaxHeight = '230px';
-        }
-        
-        const imagesMarkup = entryImages.map(imgUrl => `
+        let imgMaxHeight = '230px';
+        if (displayImages.length === 1) { gridClass = 'grid-cols-1'; imgMaxHeight = '420px'; }
+        else if (displayImages.length === 3) { gridClass = 'grid-cols-3'; imgMaxHeight = '200px'; }
+        else { gridClass = 'grid-cols-2'; imgMaxHeight = '230px'; } // 2 oder 4 Fotos → 2 Spalten
+
+
+        const imagesMarkup = displayImages.map(imgUrl => `
             <div class="flex items-center justify-center bg-gray-50 rounded border border-gray-100 p-0.5">
-                ${entry.coords 
+                ${entry.coords
                     ? `<a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" class="w-full flex justify-center">
-                        <img src="${imgUrl}" class="max-w-full h-auto object-scale-down rounded" style="max-height:${imgMaxHeight}; display:block;" />
+                        <img src="${imgUrl}" class="max-w-full h-auto object-scale-down rounded" style="max-height:${imgMaxHeight};display:block;" />
                        </a>`
-                    : `<img src="${imgUrl}" class="max-w-full h-auto object-scale-down rounded" style="max-height:${imgMaxHeight}; display:block;" />`
+                    : `<img src="${imgUrl}" class="max-w-full h-auto object-scale-down rounded" style="max-height:${imgMaxHeight};display:block;" />`
                 }
-            </div>
-        `).join('');
-        
-        const mapLink = entry.coords 
-            ? `<div class="mt-1.5 text-[10px] text-blue-600 font-semibold no-print-link text-center w-full">
+            </div>`).join('');
+
+
+        const mapLink = entry.coords
+            ? `<div class="mt-1.5 text-[10px] text-blue-600 font-semibold text-center w-full">
                 <a href="https://www.google.com/maps?q=${entry.coords.latitude},${entry.coords.longitude}" target="_blank" class="inline-flex items-center gap-1 justify-center hover:underline">
                     📍 Auf Google Maps anzeigen
                 </a>
-               </div>` 
-            : '';
-            
-        imagesDiv.innerHTML = `
-            <div class="grid ${gridClass} gap-2">
-                ${imagesMarkup}
-            </div>
-            ${mapLink}
-        `;
+               </div>` : '';
+
+        imagesDiv.innerHTML = `<div class="grid ${gridClass} gap-2">${imagesMarkup}</div>${mapLink}`;
 
         currentContentArea.appendChild(imagesDiv);
 
-        // If images overflow, move images to a new page
         if (currentPage.scrollHeight > 1123) {
             currentContentArea.removeChild(imagesDiv);
-            
-            currentPage = createNewPage();
-            currentContentArea = currentPage.querySelector('.pdf-content');
-            
+            createNewPage();
             const contNotice = document.createElement('p');
             contNotice.className = 'text-[10px] text-gray-400 italic mb-1';
             contNotice.innerText = `Fortsetzung Eintrag ${entryIndex + 1}: Fotos`;
@@ -665,17 +704,14 @@ function renderPreview() {
         }
     });
 
-    // 4. Signatures container at the end of report
+    // 4. Unterschriften
     const signatureDiv = document.createElement('div');
     signatureDiv.className = 'signature-block mt-auto pt-3 border-t border-gray-300 grid grid-cols-2 gap-8 w-full';
     signatureDiv.innerHTML = `
         <div class="text-center flex flex-col justify-end items-center h-20">
             <p class="text-[10px] text-gray-500 font-semibold mb-0.5">${escapeHtml(reportData.settings.signatureTitle1) || 'Auftragnehmer'}</p>
             <div class="h-10 flex items-center justify-center">
-                ${reportData.settings.signatureImage1 
-                    ? `<img src="${reportData.settings.signatureImage1}" class="max-h-10 max-w-full object-contain" />` 
-                    : ''
-                }
+                ${reportData.settings.signatureImage1 ? `<img src="${reportData.settings.signatureImage1}" class="max-h-10 max-w-full object-contain" />` : ''}
             </div>
             <div class="border-t border-gray-300 w-3/4 mt-0.5"></div>
             <p class="text-[8px] text-gray-400 mt-0.5">Unterschrift / Stempel</p>
@@ -683,34 +719,30 @@ function renderPreview() {
         <div class="text-center flex flex-col justify-end items-center h-20">
             <p class="text-[10px] text-gray-500 font-semibold mb-0.5">${escapeHtml(reportData.settings.signatureTitle2) || 'Auftraggeber'}</p>
             <div class="h-10 flex items-center justify-center">
-                ${reportData.settings.signatureImage2 
-                    ? `<img src="${reportData.settings.signatureImage2}" class="max-h-10 max-w-full object-contain" />` 
-                    : ''
-                }
+                ${reportData.settings.signatureImage2 ? `<img src="${reportData.settings.signatureImage2}" class="max-h-10 max-w-full object-contain" />` : ''}
             </div>
             <div class="border-t border-gray-300 w-3/4 mt-0.5"></div>
             <p class="text-[8px] text-gray-400 mt-0.5">Unterschrift / Stempel</p>
-        </div>
-    `;
+        </div>`;
 
     currentContentArea.appendChild(signatureDiv);
 
-    // If signature block overflows page height
     if (currentPage.scrollHeight > 1123) {
         currentContentArea.removeChild(signatureDiv);
-        
-        currentPage = createNewPage();
-        currentContentArea = currentPage.querySelector('.pdf-content');
-        
+        createNewPage();
         currentContentArea.appendChild(signatureDiv);
     }
 
-    // Update footer pages numbering
+    // Seitennummern aktualisieren
     const pages = container.querySelectorAll('.pdf-page');
     pages.forEach((p, idx) => {
         p.querySelector('.page-num').innerText = `Seite ${idx + 1} / ${pages.length}`;
     });
+
+    // Skala auf alle Seiten anwenden
+    applyPageScale();
 }
+
 
 // --- PDF HERUNTERLADEN UND TEILEN ---
 function generatePDF() {

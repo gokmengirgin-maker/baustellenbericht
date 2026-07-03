@@ -5,55 +5,77 @@
 .tab-content.active { display: block; animation: fadeIn 0.3s; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-/* PDF Page Layout (Yöntem 2: JavaScript Page Builder) */
+/* ───────────────────────────────────────────
+   PDF-Vorschau: Skalierte A4-Seiten
+   Das Wrapping-Div nimmt die Breite des Containers an.
+   Die eigentliche Seite wird per JS auf diese Breite
+   skaliert (transform: scale), bleibt aber intern 794px.
+─────────────────────────────────────────── */
 #report-preview {
+    width: 100%;
+    box-sizing: border-box;
+    background: #e2e8f0;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: #e2e8f0; /* Grauer Hintergrund hinter den Seiten im Web */
-    padding: 20px;
-    gap: 20px;
-    width: 100%;
-    box-sizing: border-box;
+    gap: 12px;
 }
 
+/* Wrapper: nimmt die skalierte Höhe an (per JS gesetzt) */
+.pdf-page-wrapper {
+    width: 100%;
+    position: relative;
+    /* Höhe wird per JS dynamisch gesetzt: height = 1123 * scale */
+}
+
+/* Die echte A4-Seite, immer 794x1123px, per JS nach links verschoben + skaliert */
 .pdf-page {
     width: 794px;
     height: 1123px;
     padding: 57px 45px;
     box-sizing: border-box;
     background: white;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    position: relative;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.15), 0 2px 4px -1px rgba(0,0,0,0.08);
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform-origin: top left;
+    /* transform: scale(X) wird per JS gesetzt */
     display: flex;
     flex-direction: column;
     page-break-after: always;
     break-after: page;
 }
 
-/* PDF-Erstellungsmodus: Alle Abstände und Hintergründe des Containers entfernen */
+/* ───────────────────────────────────────────
+   PDF-Erstellungsmodus (kein Scale, kein Padding)
+─────────────────────────────────────────── */
 .pdf-generation-mode {
     background: white !important;
     padding: 0 !important;
-    margin: 0 !important;
     gap: 0 !important;
+}
+.pdf-generation-mode .pdf-page-wrapper {
+    height: 1123px !important;
 }
 .pdf-generation-mode .pdf-page {
     box-shadow: none !important;
-    margin: 0 !important;
-    border: none !important;
+    transform: none !important;
+    position: relative !important;
 }
 
-/* Print CSS overrides */
+/* Print overrides */
 @media print {
     body * { visibility: hidden; }
     #report-preview, #report-preview * { visibility: visible; }
-    #report-preview { position: absolute; left: 0; top: 0; width: 100%; }
+    #report-preview { position: absolute; left: 0; top: 0; width: 100%; background: white; padding: 0; gap: 0; }
     .no-print { display: none !important; }
-    
+    .pdf-page-wrapper { height: 1123px !important; }
     .pdf-page {
-        margin: 0 !important;
         box-shadow: none !important;
+        transform: none !important;
+        position: relative !important;
         page-break-after: always !important;
         break-after: page !important;
     }
