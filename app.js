@@ -167,11 +167,13 @@ function switchTab(tabId) {
 
 // --- DYNAMISCHE METADATEN-BESCHRIFTUNGEN ---
 function updateDynamicLabels() {
-    const labelText = reportData.settings.nvtLabel || 'NVT:';
+    const labelText = (reportData.settings.nvtLabel || 'NVT:').trim();
+    // 1. Form-Tab: Label beim Eingabefeld aktualisieren
     const formLabel = document.getElementById('label-entry-nvt');
-    if (formLabel) {
-        formLabel.innerText = labelText;
-    }
+    if (formLabel) formLabel.innerText = labelText;
+    // 2. Settings-Tab: Live-Preview Badge neben dem Label aktualisieren
+    const previewBadge = document.getElementById('nvt-label-preview');
+    if (previewBadge) previewBadge.innerText = labelText;
 }
 
 // --- EINSTELLUNGEN ---
@@ -577,12 +579,13 @@ function applyPageScale() {
     const wrappers = container.querySelectorAll('.pdf-page-wrapper');
     if (wrappers.length === 0) return;
 
-    // PDF-Generation mode: keine Skalierung
+    // PDF-Generation mode oder versteckter Tab: keine Skalierung
     if (container.classList.contains('pdf-generation-mode')) return;
+    if (container.clientWidth === 0) return; // Tab ist versteckt
 
     // Verfügbare Breite des Containers (minus Padding)
     const availableWidth = container.clientWidth - 24; // 12px padding links + rechts
-    const scale = Math.min(1, availableWidth / 794);
+    const scale = Math.max(0.1, Math.min(1, availableWidth / 794));
 
     wrappers.forEach(wrapper => {
         const page = wrapper.querySelector('.pdf-page');
