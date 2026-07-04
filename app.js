@@ -366,6 +366,9 @@ async function previewSelectedImages(event) {
         }
     }
 
+    // Clear input value so that the change event triggers again for consecutive camera/gallery uploads
+    event.target.value = '';
+
     renderFormImagePreviews();
 }
 
